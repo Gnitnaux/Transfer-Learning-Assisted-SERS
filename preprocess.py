@@ -46,14 +46,14 @@ def WhittakerSmooth(x, w, lambda_, differences=1):
     Returns:
         Smoothed baseline
     """
-    X = np.matrix(x)
+    X = np.array(x).flatten()
     m = X.size
     E = eye(m, format='csc')
     for i in range(differences):
         E = E[1:] - E[:-1]
     W = diags(w, 0, shape=(m, m))
     A = csc_matrix(W + (lambda_ * E.T * E))
-    B = csc_matrix(W * X.T)
+    B = csc_matrix(W).dot(X)
     background = spsolve(A, B)
     return np.array(background)
 
@@ -77,8 +77,8 @@ def airPLS(x, lambda_=1e8, porder=3, itermax=15):
         z = WhittakerSmooth(x, w, lambda_, porder)
         d = x - z
         dssn = np.abs(d[d < 0].sum())
-        if (dssn < 0.001 * (abs(x)).sum() or i == itermax):
-            if (i == itermax): 
+        if dssn < 0.001 * (abs(x)).sum() or i == itermax:
+            if i == itermax:
                 print('WARNING: max iteration reached!')
             break
         w[d >= 0] = 0
@@ -91,6 +91,9 @@ def airPLS(x, lambda_=1e8, porder=3, itermax=15):
 def process_single_spectrum(data, window_length=7, polyorder=3, lambda_val=1e6, porder=3):
     """
     Process a single spectrum using SG filtering and AirPLS baseline correction.
+    
+    This function implements the exact processing logic from the GUI application,
+    which uses a stacking approach for compatibility with the original algorithm.
     
     Args:
         data: DataFrame with columns [Raman Shift, Intensity]
@@ -106,16 +109,17 @@ def process_single_spectrum(data, window_length=7, polyorder=3, lambda_val=1e6, 
     y = data.iloc[:, 1].values  # Intensity
     
     # Step 1: Apply SG filtering
-    # Stack current spectrum with reference for processing
+    # Note: The stacking approach is from the original GUI application algorithm.
+    # It processes the spectrum along with the reference for consistency.
     merge1 = np.vstack((y, x))
     sg_result = SG(merge1, window_length, polyorder)
     sg_filtered = sg_result[0]  # Take the first row as SG filtered result
     
     # Step 2: Apply AirPLS baseline correction
-    # Stack SG filtered result with reference
+    # Stack SG filtered result with reference for baseline estimation
     merge2 = np.vstack((sg_filtered, x))
     
-    # Apply AirPLS to both rows
+    # Apply AirPLS to both rows (algorithm requires processing reference alongside data)
     data_AirPLS = merge2.copy()
     for j in range(merge2.shape[0]):
         data_AirPLS[j] = merge2[j] - airPLS(merge2[j], lambda_=lambda_val, porder=porder)
@@ -187,10 +191,15 @@ def process_folder(input_folder, output_folder, window_length=7, polyorder=3,
         for csv_file in csv_files:
             try:
                 # Read CSV file
-                # Skip first row if it contains headers, use GBK encoding as in original code
-                data = pd.read_csv(csv_file, sep=',', skiprows=[0], 
-                                  names=['Raman Shift', 'Intensity'], 
-                                  encoding='GBK')
+                # Try GBK encoding first (common for Chinese systems), fall back to UTF-8
+                try:
+                    data = pd.read_csv(csv_file, sep=',', skiprows=[0], 
+                                      names=['Raman Shift', 'Intensity'], 
+                                      encoding='GBK')
+                except UnicodeDecodeError:
+                    data = pd.read_csv(csv_file, sep=',', skiprows=[0], 
+                                      names=['Raman Shift', 'Intensity'], 
+                                      encoding='utf-8')
                 
                 # Store raman shift values (should be same for all files)
                 if raman_shift is None:
