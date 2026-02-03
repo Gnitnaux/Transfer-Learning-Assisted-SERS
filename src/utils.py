@@ -39,11 +39,11 @@ def read_spectra_train(directory):
             if Raman_Shift is None:
                 Raman_Shift = sp['Raman Shift'].values
             Intensity_list.append(sp['Intensity'].values)
-            Category_list.append(folder.split('_')[0])  # 只取文件夹名前部分作为标签
-            Concentration_list.append((folder.split('_')[1]).split('u')[0])  # 浓度部分 
+            Category_list.append(folder.split('_')[0])
+            Concentration_list.append((folder.split('_')[1]).split('u')[0]) 
 
-    Intensity = np.array(Intensity_list)        # shape = (光谱条数, 数据点数)
-    Category = np.array(Category_list)        # 标签
+    Intensity = np.array(Intensity_list)
+    Category = np.array(Category_list)
     Concentration = np.array(Concentration_list, dtype=float)
 
     return Raman_Shift, Intensity, Category, Concentration
