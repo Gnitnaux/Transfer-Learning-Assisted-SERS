@@ -1,6 +1,8 @@
 # Transfer-Learning-Assisted-SERS
 
-Transfer learning strategy for catecholamine quantification in mixture, motivated by Angew. Chem. Int. Ed. 2025, 64, e202508717 (doi.org/10.1002/anie).202508717
+Transfer learning strategy for catecholamine quantification in mixture, motivated by Emily et al. [1] And the author of this project is Xuanting Liu from Shanghai Jiao Tong University.
+
+[1] E. X. Tan, J. R. T. Chen, D. W. C. Pang, N. S. Tan, I. Y. Phang, X. Y. Ling, *Angew. Chem. Int. Ed*. 2025, 64, e202508717. https://doi.org/10.1002/anie.202508717
 
 ## Project Structure
 
