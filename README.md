@@ -107,13 +107,16 @@ Each CSV file should contain two columns:
 - All spectra in the same subfolder should have the same Raman shift range
 - Typical Raman shift range: 400-1800 cm⁻¹ (configurable)
 
-### Main Program Interface
+### Work Pipeline
 
 The `main.py` script serves as the main entry point for the SERS analysis pipeline.
 
 ```bash
-# Run preprocessing (processes both train and test folders)
-python main.py --mode preprocess --data-dir data/raw --output-dir data/preprocessed
+# Preprocessing
+# before all the procedure, store the raw data in data/raw
+# run it to preprocess raw data in train and test seperately 
+# save the processed data in data/preprocessed
+python preprocess.py 
 
 # Run training
 python main.py --mode train --data-dir data/preprocessed --model-dir models
@@ -125,38 +128,9 @@ python main.py --mode predict --model-dir models
 ### Preprocessing Program
 
 The `preprocess.py` script can be run independently for data preprocessing.
-It applies SG (Savitzky-Golay) filtering and AirPLS baseline correction to both 
-training and test datasets:
+It applies SG (Savitzky-Golay) filtering and AirPLS baseline correction to both training and test datasets. It's a GUI program which is easy to use.
 
-```bash
-# Basic usage with default parameters
-python preprocess.py --data-dir data/raw --output-dir data/preprocessed
 
-# Advanced usage with custom parameters
-python preprocess.py \
-    --data-dir data/raw \
-    --output-dir data/preprocessed \
-    --window-length 7 \
-    --polyorder 3 \
-    --lambda-val 1000000 \
-    --porder 3 \
-    --prefix processed_
-```
-
-**Preprocessing Parameters:**
-- `--window-length`: SG filter window length (must be odd, default: 7)
-- `--polyorder`: SG filter polynomial order (default: 3)
-- `--lambda-val`: AirPLS lambda parameter (default: 1e6)
-- `--porder`: AirPLS polynomial order (default: 3)
-- `--prefix`: Prefix for output filenames (default: "processed_")
-
-### Available Options
-
-- `--mode`: Operation mode (preprocess, train, evaluate, predict)
-- `--data-dir`: Path to data directory
-- `--output-dir`: Path to output directory
-- `--model-dir`: Path to model directory
-- `--config`: Path to configuration file (optional)
 
 ## Directory Descriptions
 
@@ -178,37 +152,6 @@ Contains all custom functions and detailed training code:
 - **utils.py**: Utility functions for data validation, metrics calculation, and configuration management
 - **__init__.py**: Package initialization
 
-## Development
-
-### Adding New Features
-
-1. Add custom functions to the `src/` directory
-2. Update `main.py` or create new scripts to use these functions
-3. Document your changes in the code and README
-
-### Data Processing Pipeline
-
-The preprocessing pipeline applies the following steps to each spectral file:
-
-1. **SG Filtering**: Savitzky-Golay filter smooths spectral data
-   - Window length: adjustable (default: 7)
-   - Polynomial order: adjustable (default: 3)
-   - Reduces high-frequency noise while preserving peak shapes
-
-2. **AirPLS Baseline Correction**: Adaptive Iteratively Reweighted Penalized Least Squares
-   - Lambda: adjustable (default: 1e6) - controls smoothness of baseline
-   - Polynomial order: adjustable (default: 3)
-   - Automatically removes baseline drift and background fluorescence
-
-**Algorithm Details**: The processing uses a reference-based approach where spectra are 
-processed alongside their Raman shift values to ensure consistent scaling and alignment.
-This implementation follows the algorithm from the original spectroscopy processing GUI.
-
-The processing is applied independently to:
-- All files in `data/raw/train/` subfolders → saved to `data/preprocessed/train/`
-- All files in `data/raw/test/` subfolders → saved to `data/preprocessed/test/`
-
-Each processed subfolder also includes a merged CSV file containing the mean spectrum across all samples in that folder.
 
 ## Contributing
 
