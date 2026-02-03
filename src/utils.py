@@ -1,75 +1,50 @@
 """
 Utility functions for SERS data processing and analysis
 """
+import os
+import pandas as pd
+import numpy as np
 
-try:
-    import numpy as np
-    HAS_NUMPY = True
-except ImportError:
-    HAS_NUMPY = False
-
-
-def validate_data(data):
+def read_spectra_train(directory):
     """
-    Validate input data format and quality.
-    
+    Read and preprocess SERS spectral data from the specified directory for training.
     Args:
-        data: Input data to validate
-        
+        directory (str): Path to the directory containing spectral data folders.
     Returns:
-        bool: True if data is valid, False otherwise
+        tuple: (Raman_Shift, Intensity, Category, Concentration)
     """
-    # TODO: Implement validation logic
-    return True
 
+    # read data from directory
+    data_dict = {}
+    for folder in os.listdir(directory):
+        folder_path = os.path.join(directory, folder)
+        if os.path.isdir(folder_path):
+            spectra_data = []
+            for file in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, file)
+                if file.endswith('.csv'):
+                    data = pd.read_csv(file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')
+                    spectra_data.append(data)
+            data_dict[folder] = spectra_data
 
-def calculate_metrics(predictions, targets):
-    """
-    Calculate evaluation metrics for model predictions.
-    
-    Args:
-        predictions: Model predictions
-        targets: Ground truth targets
-        
-    Returns:
-        dict: Dictionary containing various metrics
-    """
-    # TODO: Implement metrics calculation
-    # - Accuracy
-    # - Precision
-    # - Recall
-    # - F1-score
-    # - MAE, MSE for regression tasks
-    
-    return {
-        "accuracy": 0.0,
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1_score": 0.0
-    }
+    # data reshape
+    # train data name: [DA/E/NE]_[concentration]uM_[replicate]
+    Intensity_list = []
+    Category_list = []
+    Concentration_list = []
+    Raman_Shift = None
 
+    for folder, spectra in data_dict.items():
+        for sp in spectra:
+            if Raman_Shift is None:
+                Raman_Shift = sp['Raman Shift'].values
+            Intensity_list.append(sp['Intensity'].values)
+            Category_list.append(folder.split('_')[0])  # 只取文件夹名前部分作为标签
+            Concentration_list.append((folder.split('_')[1]).split('u')[0])  # 浓度部分 
 
-def save_results(results, output_path):
-    """
-    Save analysis results to file.
-    
-    Args:
-        results: Results to save
-        output_path: Path to save the results
-    """
-    # TODO: Implement results saving logic
-    pass
+    Intensity = np.array(Intensity_list)        # shape = (光谱条数, 数据点数)
+    Category = np.array(Category_list)        # 标签
+    Concentration = np.array(Concentration_list, dtype=float)
 
+    return Raman_Shift, Intensity, Category, Concentration
 
-def load_config(config_path):
-    """
-    Load configuration from file.
-    
-    Args:
-        config_path: Path to configuration file
-        
-    Returns:
-        dict: Configuration dictionary
-    """
-    # TODO: Implement config loading (JSON, YAML, etc.)
-    return {}

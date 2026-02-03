@@ -12,12 +12,12 @@ Transfer-Learning-Assisted-SERS/
 ├── data/                       # Data storage directory
 │   ├── raw/                    # Raw SERS data files
 │   │   ├── train/              # Training data subfolders
-│   │   │   ├── folder1/        # Each subfolder contains CSV files
-│   │   │   ├── folder2/        # with [Raman Shift, Intensity] format
+│   │   │   ├── DA_1uM_1/        # Each subfolder contains CSV files
+│   │   │   ├── DA_2uM_1/        # with [Raman Shift, Intensity] format
 │   │   │   └── ...
 │   │   └── test/               # Test data subfolders
-│   │       ├── folder1/        # Same structure as train/
-│   │       ├── folder2/
+│   │       ├── 2uM_6uM_8uM_1/        # Same structure as train/
+│   │       ├── 1uM_3uM_10uM_1/
 │   │       └── ...
 │   └── preprocessed/           # Preprocessed data files
 │       ├── train/              # Preprocessed training data
@@ -56,25 +56,28 @@ pip install -r requirements.txt
 
 ### Quick Start Example
 
-Here's a complete workflow from data organization to preprocessing:
+Here's a complete workflow from data organization to preprocessing.
+
+The folder name (label) in train should be `[DA/E/NE]_[XX]uM_[Index]`
+The folder name (label) in test should be `[DA]uM_[E]uM_[NE]uM_[Index]`
 
 ```bash
 # 1. Organize your data
 # Place your CSV files in the following structure:
-# data/raw/train/class1/sample1.csv
-# data/raw/train/class1/sample2.csv
-# data/raw/train/class2/sample1.csv
-# data/raw/test/class1/sample1.csv
-# data/raw/test/class2/sample1.csv
+# data/raw/train/DA_1uM_1/sample1.csv
+# data/raw/train/DA_2uM_1/sample2.csv
+# data/raw/train/DA_3uM_1/sample1.csv
+# data/raw/test/2uM_6uM_8uM_1/sample1.csv
+# data/raw/test/1uM_3uM_10uM_1/sample1.csv
 
 # 2. Run preprocessing with default parameters
 python preprocess.py
 
 # 3. Check the output
 # Preprocessed files will be in:
-# data/preprocessed/train/class1/processed_sample1.csv
-# data/preprocessed/train/class1/processed_class1_mean.csv
-# data/preprocessed/test/class1/processed_sample1.csv
+# data/preprocessed/train/DA_1uM_1/processed_sample1.csv
+# data/preprocessed/train/DA_2uM_1/processed_class1_mean.csv
+# data/preprocessed/test/2uM_6uM_8uM_1/processed_sample1.csv
 # etc.
 ```
 
@@ -85,15 +88,15 @@ Before preprocessing, organize your data as follows:
 ```
 data/raw/
 ├── train/                      # Training dataset
-│   ├── class1/                 # Each class/category has its own folder
+│   ├── DA_1uM_1/                 # Each class/category has its own folder
 │   │   ├── sample1.csv
 │   │   ├── sample2.csv
 │   │   └── ...
-│   ├── class2/
+│   ├── DA_2uM_1/
 │   │   └── ...
 │   └── ...
 └── test/                       # Test dataset
-    ├── class1/                 # Same structure as train
+    ├── 2uM_6uM_8uM_1/                 # Same structure as train
     │   ├── sample1.csv
     │   └── ...
     └── ...
@@ -105,9 +108,8 @@ Each CSV file should contain two columns:
 
 **Important Notes**:
 - The first row will be skipped during processing (assumed to be headers)
-- Files should use either GBK or UTF-8 encoding
+- Files should use either GBK encoding (if there is any Chinese)
 - All spectra in the same subfolder should have the same Raman shift range
-- Typical Raman shift range: 400-1800 cm⁻¹ (configurable)
 
 ### Work Pipeline
 
