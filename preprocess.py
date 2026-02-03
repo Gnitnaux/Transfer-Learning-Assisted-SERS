@@ -40,7 +40,9 @@ def load_raw_data(data_dir):
     
     # TODO: Implement actual data loading logic
     # This is a placeholder for the actual implementation
-    data_files = list(data_dir.glob("*.csv")) + list(data_dir.glob("*.txt"))
+    data_files = []
+    for pattern in ["*.csv", "*.txt"]:
+        data_files.extend(data_dir.glob(pattern))
     
     if not data_files:
         print("Warning: No data files found in the directory")
