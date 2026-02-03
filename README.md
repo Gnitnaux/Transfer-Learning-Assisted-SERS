@@ -52,6 +52,30 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Quick Start Example
+
+Here's a complete workflow from data organization to preprocessing:
+
+```bash
+# 1. Organize your data
+# Place your CSV files in the following structure:
+# data/raw/train/class1/sample1.csv
+# data/raw/train/class1/sample2.csv
+# data/raw/train/class2/sample1.csv
+# data/raw/test/class1/sample1.csv
+# data/raw/test/class2/sample1.csv
+
+# 2. Run preprocessing with default parameters
+python preprocess.py
+
+# 3. Check the output
+# Preprocessed files will be in:
+# data/preprocessed/train/class1/processed_sample1.csv
+# data/preprocessed/train/class1/processed_class1_mean.csv
+# data/preprocessed/test/class1/processed_sample1.csv
+# etc.
+```
+
 ### Data Organization
 
 Before preprocessing, organize your data as follows:
@@ -76,6 +100,12 @@ data/raw/
 Each CSV file should contain two columns:
 - Column 1: Raman Shift (wavelength values)
 - Column 2: Intensity (spectral intensity values)
+
+**Important Notes**:
+- The first row will be skipped during processing (assumed to be headers)
+- Files should use either GBK or UTF-8 encoding
+- All spectra in the same subfolder should have the same Raman shift range
+- Typical Raman shift range: 400-1800 cm⁻¹ (configurable)
 
 ### Main Program Interface
 
@@ -163,10 +193,16 @@ The preprocessing pipeline applies the following steps to each spectral file:
 1. **SG Filtering**: Savitzky-Golay filter smooths spectral data
    - Window length: adjustable (default: 7)
    - Polynomial order: adjustable (default: 3)
+   - Reduces high-frequency noise while preserving peak shapes
 
 2. **AirPLS Baseline Correction**: Adaptive Iteratively Reweighted Penalized Least Squares
-   - Lambda: adjustable (default: 1e6)
+   - Lambda: adjustable (default: 1e6) - controls smoothness of baseline
    - Polynomial order: adjustable (default: 3)
+   - Automatically removes baseline drift and background fluorescence
+
+**Algorithm Details**: The processing uses a reference-based approach where spectra are 
+processed alongside their Raman shift values to ensure consistent scaling and alignment.
+This implementation follows the algorithm from the original spectroscopy processing GUI.
 
 The processing is applied independently to:
 - All files in `data/raw/train/` subfolders → saved to `data/preprocessed/train/`
