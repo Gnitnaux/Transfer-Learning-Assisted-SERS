@@ -9,7 +9,17 @@ Transfer-Learning-Assisted-SERS/
 │
 ├── data/                       # Data storage directory
 │   ├── raw/                    # Raw SERS data files
+│   │   ├── train/              # Training data subfolders
+│   │   │   ├── folder1/        # Each subfolder contains CSV files
+│   │   │   ├── folder2/        # with [Raman Shift, Intensity] format
+│   │   │   └── ...
+│   │   └── test/               # Test data subfolders
+│   │       ├── folder1/        # Same structure as train/
+│   │       ├── folder2/
+│   │       └── ...
 │   └── preprocessed/           # Preprocessed data files
+│       ├── train/              # Preprocessed training data
+│       └── test/               # Preprocessed test data
 │
 ├── models/                     # Trained model storage
 │
@@ -42,12 +52,37 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Data Organization
+
+Before preprocessing, organize your data as follows:
+
+```
+data/raw/
+├── train/                      # Training dataset
+│   ├── class1/                 # Each class/category has its own folder
+│   │   ├── sample1.csv
+│   │   ├── sample2.csv
+│   │   └── ...
+│   ├── class2/
+│   │   └── ...
+│   └── ...
+└── test/                       # Test dataset
+    ├── class1/                 # Same structure as train
+    │   ├── sample1.csv
+    │   └── ...
+    └── ...
+```
+
+Each CSV file should contain two columns:
+- Column 1: Raman Shift (wavelength values)
+- Column 2: Intensity (spectral intensity values)
+
 ### Main Program Interface
 
 The `main.py` script serves as the main entry point for the SERS analysis pipeline.
 
 ```bash
-# Run preprocessing
+# Run preprocessing (processes both train and test folders)
 python main.py --mode preprocess --data-dir data/raw --output-dir data/preprocessed
 
 # Run training
@@ -59,11 +94,31 @@ python main.py --mode predict --model-dir models
 
 ### Preprocessing Program
 
-The `preprocess.py` script can be run independently for data preprocessing:
+The `preprocess.py` script can be run independently for data preprocessing.
+It applies SG (Savitzky-Golay) filtering and AirPLS baseline correction to both 
+training and test datasets:
 
 ```bash
+# Basic usage with default parameters
 python preprocess.py --data-dir data/raw --output-dir data/preprocessed
+
+# Advanced usage with custom parameters
+python preprocess.py \
+    --data-dir data/raw \
+    --output-dir data/preprocessed \
+    --window-length 7 \
+    --polyorder 3 \
+    --lambda-val 1000000 \
+    --porder 3 \
+    --prefix processed_
 ```
+
+**Preprocessing Parameters:**
+- `--window-length`: SG filter window length (must be odd, default: 7)
+- `--polyorder`: SG filter polynomial order (default: 3)
+- `--lambda-val`: AirPLS lambda parameter (default: 1e6)
+- `--porder`: AirPLS polynomial order (default: 3)
+- `--prefix`: Prefix for output filenames (default: "processed_")
 
 ### Available Options
 
@@ -76,8 +131,13 @@ python preprocess.py --data-dir data/raw --output-dir data/preprocessed
 ## Directory Descriptions
 
 ### data/
-- **raw/**: Store your raw SERS data files here (CSV format, with 2 columns `[Raman shift, Intensity]`)
+- **raw/**: Store your raw SERS data files here
+  - **train/**: Training dataset organized in subfolders by class/category
+  - **test/**: Test dataset organized in subfolders by class/category
+  - Each CSV file should have 2 columns: `[Raman Shift, Intensity]`
 - **preprocessed/**: Preprocessed and normalized data will be saved here
+  - **train/**: Preprocessed training data (after SG filtering and AirPLS baseline correction)
+  - **test/**: Preprocessed test data
 
 ### models/
 Store trained models here. Models will be saved with descriptive names including timestamps and performance metrics.
@@ -98,7 +158,21 @@ Contains all custom functions and detailed training code:
 
 ### Data Processing Pipeline
 
+The preprocessing pipeline applies the following steps to each spectral file:
 
+1. **SG Filtering**: Savitzky-Golay filter smooths spectral data
+   - Window length: adjustable (default: 7)
+   - Polynomial order: adjustable (default: 3)
+
+2. **AirPLS Baseline Correction**: Adaptive Iteratively Reweighted Penalized Least Squares
+   - Lambda: adjustable (default: 1e6)
+   - Polynomial order: adjustable (default: 3)
+
+The processing is applied independently to:
+- All files in `data/raw/train/` subfolders → saved to `data/preprocessed/train/`
+- All files in `data/raw/test/` subfolders → saved to `data/preprocessed/test/`
+
+Each processed subfolder also includes a merged CSV file containing the mean spectrum across all samples in that folder.
 
 ## Contributing
 
