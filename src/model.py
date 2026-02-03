@@ -94,7 +94,6 @@ class TransferLearningModel:
         """
         # TODO: Implement model saving
         print(f"Model would be saved to: {path}")
-        pass
     
     def load_model(self, path):
         """
@@ -105,7 +104,6 @@ class TransferLearningModel:
         """
         # TODO: Implement model loading
         print(f"Model would be loaded from: {path}")
-        pass
 
 
 def create_model(config):
