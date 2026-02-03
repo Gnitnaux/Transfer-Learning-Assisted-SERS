@@ -2,176 +2,308 @@
 """
 Preprocessing program for SERS data
 This module handles data preprocessing operations including:
-- Data loading
-- Data cleaning
-- Feature extraction
-- Data normalization
-- Data augmentation
+- SG (Savitzky-Golay) filtering for spectral smoothing
+- AirPLS baseline correction
+- Batch processing of train and test datasets
 """
 
 import os
 import sys
 from pathlib import Path
+import argparse
+import pandas as pd
+import numpy as np
+from scipy import signal
+from scipy.sparse import diags, eye, csc_matrix
+from scipy.sparse.linalg import spsolve
 
-try:
-    import numpy as np
-    HAS_NUMPY = True
-except ImportError:
-    HAS_NUMPY = False
-    print("Warning: numpy not installed. Some features may be limited.")
 
-
-def load_raw_data(data_dir):
+def SG(data, window_length, polyorder):
     """
-    Load raw SERS data from the specified directory.
+    Apply Savitzky-Golay filter to smooth spectral data.
     
     Args:
-        data_dir (str): Path to the directory containing raw data files
+        data: Input data array (can be 1D or 2D)
+        window_length: Length of the filter window (must be odd)
+        polyorder: Order of the polynomial used to fit the samples
         
     Returns:
-        dict: Dictionary containing loaded data
+        Filtered data array
     """
-    data_dir = Path(data_dir)
+    return signal.savgol_filter(data, window_length, polyorder)
+
+
+def WhittakerSmooth(x, w, lambda_, differences=1):
+    """
+    Whittaker smoother for baseline estimation.
     
-    if not data_dir.exists():
-        raise FileNotFoundError(f"Data directory not found: {data_dir}")
+    Args:
+        x: Input signal
+        w: Weights
+        lambda_: Smoothing parameter
+        differences: Order of differences
+        
+    Returns:
+        Smoothed baseline
+    """
+    X = np.array(x).flatten()
+    m = X.size
+    E = eye(m, format='csc')
+    for i in range(differences):
+        E = E[1:] - E[:-1]
+    W = diags(w, 0, shape=(m, m))
+    A = csc_matrix(W + (lambda_ * E.T * E))
+    B = csc_matrix(W).dot(X)
+    background = spsolve(A, B)
+    return np.array(background)
+
+
+def airPLS(x, lambda_=1e8, porder=3, itermax=15):
+    """
+    Adaptive Iteratively Reweighted Penalized Least Squares for baseline correction.
     
-    print(f"Loading raw data from: {data_dir}")
+    Args:
+        x: Input signal
+        lambda_: Smoothing parameter (larger = smoother baseline)
+        porder: Order of differences in penalty
+        itermax: Maximum number of iterations
+        
+    Returns:
+        Estimated baseline
+    """
+    m = x.shape[0]
+    w = np.ones(m)
+    for i in range(1, itermax + 1):
+        z = WhittakerSmooth(x, w, lambda_, porder)
+        d = x - z
+        dssn = np.abs(d[d < 0].sum())
+        if dssn < 0.001 * (abs(x)).sum() or i == itermax:
+            if i == itermax:
+                print('WARNING: max iteration reached!')
+            break
+        w[d >= 0] = 0
+        w[d < 0] = np.exp(i * np.abs(d[d < 0]) / dssn)
+        w[0] = np.exp(i * (d[d < 0]).max() / dssn)
+        w[-1] = w[0]
+    return z
+
+
+def process_single_spectrum(data, window_length=7, polyorder=3, lambda_val=1e6, porder=3):
+    """
+    Process a single spectrum using SG filtering and AirPLS baseline correction.
     
-    # TODO: Implement actual data loading logic
-    # This is a placeholder for the actual implementation
-    data_files = []
-    for pattern in ["*.csv", "*.txt"]:
-        data_files.extend(data_dir.glob(pattern))
+    This function implements the exact processing logic from the GUI application,
+    which uses a stacking approach for compatibility with the original algorithm.
     
-    if not data_files:
-        print("Warning: No data files found in the directory")
+    Args:
+        data: DataFrame with columns [Raman Shift, Intensity]
+        window_length: SG filter window length
+        polyorder: SG filter polynomial order
+        lambda_val: AirPLS lambda parameter
+        porder: AirPLS polynomial order
+        
+    Returns:
+        DataFrame with processed spectrum [Raman Shift, Processed Intensity]
+    """
+    x = data.iloc[:, 0].values  # Raman Shift (reference)
+    y = data.iloc[:, 1].values  # Intensity
+    
+    # Step 1: Apply SG filtering
+    # Note: The stacking approach is from the original GUI application algorithm.
+    # It processes the spectrum along with the reference for consistency.
+    merge1 = np.vstack((y, x))
+    sg_result = SG(merge1, window_length, polyorder)
+    sg_filtered = sg_result[0]  # Take the first row as SG filtered result
+    
+    # Step 2: Apply AirPLS baseline correction
+    # Stack SG filtered result with reference for baseline estimation
+    merge2 = np.vstack((sg_filtered, x))
+    
+    # Apply AirPLS to both rows (algorithm requires processing reference alongside data)
+    data_AirPLS = merge2.copy()
+    for j in range(merge2.shape[0]):
+        data_AirPLS[j] = merge2[j] - airPLS(merge2[j], lambda_=lambda_val, porder=porder)
+    
+    final_result = data_AirPLS[0]  # Take the first row as final result
+    
+    # Return as DataFrame
+    processed_data = pd.DataFrame({
+        'Raman Shift': x, 
+        'Processed Intensity': final_result
+    })
+    
+    return processed_data
+
+
+def process_folder(input_folder, output_folder, window_length=7, polyorder=3, 
+                   lambda_val=1e6, porder=3, prefix="processed_"):
+    """
+    Process all CSV files in a folder and its subfolders.
+    
+    Args:
+        input_folder: Path to input folder containing subfolders with CSV files
+        output_folder: Path to output folder
+        window_length: SG filter window length
+        polyorder: SG filter polynomial order
+        lambda_val: AirPLS lambda parameter
+        porder: AirPLS polynomial order
+        prefix: Prefix for output filenames
+        
+    Returns:
+        Dictionary mapping subfolder names to processed data
+    """
+    input_path = Path(input_folder)
+    output_path = Path(output_folder)
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    # Find all subfolders
+    subfolders = [f for f in input_path.iterdir() if f.is_dir()]
+    
+    if not subfolders:
+        print(f"Warning: No subfolders found in {input_folder}")
         return {}
     
-    print(f"Found {len(data_files)} data files")
+    print(f"\nProcessing {len(subfolders)} subfolders in {input_folder}...")
     
-    # Placeholder return
-    return {"files": data_files, "count": len(data_files)}
-
-
-def clean_data(raw_data):
-    """
-    Clean the raw data by removing outliers and handling missing values.
+    all_processed = {}
     
-    Args:
-        raw_data (dict): Raw data dictionary
+    for subfolder in subfolders:
+        subfolder_name = subfolder.name
+        print(f"  Processing subfolder: {subfolder_name}")
         
-    Returns:
-        dict: Cleaned data
-    """
-    print("Cleaning data...")
-    
-    # TODO: Implement data cleaning logic
-    # - Remove outliers
-    # - Handle missing values
-    # - Remove duplicates
-    
-    return raw_data
-
-
-def normalize_data(data):
-    """
-    Normalize the data using appropriate normalization techniques.
-    
-    Args:
-        data (dict): Data to normalize
+        # Create output subfolder
+        output_subfolder = output_path / subfolder_name
+        output_subfolder.mkdir(parents=True, exist_ok=True)
         
-    Returns:
-        dict: Normalized data
-    """
-    print("Normalizing data...")
-    
-    # TODO: Implement normalization logic
-    # - Standard scaling
-    # - Min-max scaling
-    # - Other domain-specific normalization
-    
-    return data
-
-
-def extract_features(data):
-    """
-    Extract relevant features from the preprocessed data.
-    
-    Args:
-        data (dict): Preprocessed data
+        # Find all CSV files in this subfolder
+        csv_files = list(subfolder.glob("*.csv"))
         
-    Returns:
-        dict: Data with extracted features
-    """
-    print("Extracting features...")
+        if not csv_files:
+            print(f"    Warning: No CSV files found in {subfolder_name}")
+            continue
+        
+        print(f"    Found {len(csv_files)} CSV files")
+        
+        processed_files = {}
+        all_spectra = []  # To calculate mean spectrum
+        raman_shift = None
+        
+        for csv_file in csv_files:
+            try:
+                # Read CSV file
+                # Try GBK encoding first (common for Chinese systems), fall back to UTF-8
+                try:
+                    data = pd.read_csv(csv_file, sep=',', skiprows=[0], 
+                                      names=['Raman Shift', 'Intensity'], 
+                                      encoding='GBK')
+                except UnicodeDecodeError:
+                    data = pd.read_csv(csv_file, sep=',', skiprows=[0], 
+                                      names=['Raman Shift', 'Intensity'], 
+                                      encoding='utf-8')
+                
+                # Store raman shift values (should be same for all files)
+                if raman_shift is None:
+                    raman_shift = data.iloc[:, 0].values
+                
+                # Process the spectrum
+                processed_data = process_single_spectrum(
+                    data, window_length, polyorder, lambda_val, porder
+                )
+                
+                # Save individual processed file
+                output_filename = f"{prefix}{csv_file.stem}.csv"
+                output_filepath = output_subfolder / output_filename
+                processed_data.to_csv(output_filepath, index=False)
+                
+                # Store for mean calculation
+                processed_files[csv_file.name] = processed_data
+                all_spectra.append(processed_data['Processed Intensity'].values)
+                
+            except Exception as e:
+                print(f"    Error processing {csv_file.name}: {str(e)}")
+                continue
+        
+        # Calculate and save mean spectrum for this subfolder
+        if all_spectra:
+            mean_spectrum = np.mean(all_spectra, axis=0)
+            mean_data = pd.DataFrame({
+                'Raman Shift': raman_shift,
+                f'{subfolder_name} Mean': mean_spectrum
+            })
+            mean_filepath = output_subfolder / f"{prefix}{subfolder_name}_mean.csv"
+            mean_data.to_csv(mean_filepath, index=False)
+            print(f"    Saved mean spectrum to {mean_filepath.name}")
+        
+        all_processed[subfolder_name] = processed_files
+        print(f"    Completed {subfolder_name}: {len(processed_files)} files processed")
     
-    # TODO: Implement feature extraction logic
-    # - Spectral features
-    # - Statistical features
-    # - Domain-specific features
-    
-    return data
+    return all_processed
 
 
-def save_preprocessed_data(data, output_dir):
+def run_preprocessing(data_dir, output_dir, window_length=7, polyorder=3, 
+                     lambda_val=1e6, porder=3, prefix="processed_"):
     """
-    Save preprocessed data to the output directory.
+    Main preprocessing pipeline for both train and test datasets.
     
     Args:
-        data (dict): Preprocessed data to save
-        output_dir (str): Path to the output directory
-    """
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    print(f"Saving preprocessed data to: {output_dir}")
-    
-    # TODO: Implement data saving logic
-    # - Save as numpy arrays
-    # - Save as CSV
-    # - Save metadata
-    
-    # Placeholder: Create a marker file
-    marker_file = output_dir / "preprocessed.txt"
-    with open(marker_file, "w") as f:
-        f.write("Preprocessed data placeholder\n")
-        f.write(f"Number of files processed: {data.get('count', 0)}\n")
-    
-    print(f"Saved marker file: {marker_file}")
-
-
-def run_preprocessing(data_dir, output_dir):
-    """
-    Main preprocessing pipeline.
-    
-    Args:
-        data_dir (str): Path to raw data directory
-        output_dir (str): Path to output directory for preprocessed data
+        data_dir: Path to raw data directory (should contain train/ and test/ subfolders)
+        output_dir: Path to output directory for preprocessed data
+        window_length: SG filter window length
+        polyorder: SG filter polynomial order
+        lambda_val: AirPLS lambda parameter
+        porder: AirPLS polynomial order
+        prefix: Prefix for output filenames
     """
     print("\n" + "=" * 60)
     print("SERS Data Preprocessing Pipeline")
     print("=" * 60)
+    print(f"Input directory: {data_dir}")
+    print(f"Output directory: {output_dir}")
+    print(f"\nPreprocessing parameters:")
+    print(f"  SG Filter - window_length: {window_length}, polyorder: {polyorder}")
+    print(f"  AirPLS - lambda: {lambda_val}, porder: {porder}")
+    print(f"  Output prefix: {prefix}")
+    print("=" * 60)
     
-    # Step 1: Load raw data
-    print("\nStep 1: Loading raw data...")
-    raw_data = load_raw_data(data_dir)
+    data_path = Path(data_dir)
+    output_path = Path(output_dir)
     
-    # Step 2: Clean data
-    print("\nStep 2: Cleaning data...")
-    cleaned_data = clean_data(raw_data)
+    # Ensure window_length is odd
+    if window_length % 2 == 0:
+        window_length += 1
+        print(f"\nNote: Adjusted window_length to {window_length} (must be odd)")
     
-    # Step 3: Normalize data
-    print("\nStep 3: Normalizing data...")
-    normalized_data = normalize_data(cleaned_data)
+    # Process train folder
+    train_input = data_path / "train"
+    train_output = output_path / "train"
     
-    # Step 4: Extract features
-    print("\nStep 4: Extracting features...")
-    processed_data = extract_features(normalized_data)
+    if train_input.exists():
+        print("\n" + "-" * 60)
+        print("Processing TRAIN dataset")
+        print("-" * 60)
+        train_processed = process_folder(
+            train_input, train_output, window_length, polyorder, 
+            lambda_val, porder, prefix
+        )
+        print(f"\nTrain processing complete: {len(train_processed)} categories processed")
+    else:
+        print(f"\nWarning: Train folder not found at {train_input}")
     
-    # Step 5: Save preprocessed data
-    print("\nStep 5: Saving preprocessed data...")
-    save_preprocessed_data(processed_data, output_dir)
+    # Process test folder
+    test_input = data_path / "test"
+    test_output = output_path / "test"
+    
+    if test_input.exists():
+        print("\n" + "-" * 60)
+        print("Processing TEST dataset")
+        print("-" * 60)
+        test_processed = process_folder(
+            test_input, test_output, window_length, polyorder, 
+            lambda_val, porder, prefix
+        )
+        print(f"\nTest processing complete: {len(test_processed)} categories processed")
+    else:
+        print(f"\nWarning: Test folder not found at {test_input}")
     
     print("\n" + "=" * 60)
     print("Preprocessing completed successfully!")
@@ -179,16 +311,14 @@ def run_preprocessing(data_dir, output_dir):
 
 
 if __name__ == "__main__":
-    import argparse
-    
     parser = argparse.ArgumentParser(
-        description="Preprocess SERS data for transfer learning"
+        description="Preprocess SERS data for transfer learning using SG filtering and AirPLS baseline correction"
     )
     parser.add_argument(
         "--data-dir",
         type=str,
         default="data/raw",
-        help="Path to raw data directory"
+        help="Path to raw data directory (should contain train/ and test/ subfolders)"
     )
     parser.add_argument(
         "--output-dir",
@@ -196,7 +326,46 @@ if __name__ == "__main__":
         default="data/preprocessed",
         help="Path to output directory for preprocessed data"
     )
+    parser.add_argument(
+        "--window-length",
+        type=int,
+        default=7,
+        help="SG filter window length (must be odd, default: 7)"
+    )
+    parser.add_argument(
+        "--polyorder",
+        type=int,
+        default=3,
+        help="SG filter polynomial order (default: 3)"
+    )
+    parser.add_argument(
+        "--lambda-val",
+        type=float,
+        default=1e6,
+        help="AirPLS lambda parameter (default: 1e6)"
+    )
+    parser.add_argument(
+        "--porder",
+        type=int,
+        default=3,
+        help="AirPLS polynomial order (default: 3)"
+    )
+    parser.add_argument(
+        "--prefix",
+        type=str,
+        default="processed_",
+        help="Prefix for output filenames (default: 'processed_')"
+    )
     
     args = parser.parse_args()
     
-    run_preprocessing(args.data_dir, args.output_dir)
+    run_preprocessing(
+        args.data_dir, 
+        args.output_dir,
+        args.window_length,
+        args.polyorder,
+        args.lambda_val,
+        args.porder,
+        args.prefix
+    )
+

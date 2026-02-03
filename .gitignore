@@ -1,6 +1,12 @@
 # Data files
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/train/
+!data/raw/test/
+data/raw/train/*
+!data/raw/train/.gitkeep
+data/raw/test/*
+!data/raw/test/.gitkeep
 data/preprocessed/*
 !data/preprocessed/.gitkeep
 
