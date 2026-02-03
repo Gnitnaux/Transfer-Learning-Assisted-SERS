@@ -3,6 +3,7 @@ Training module for Transfer Learning Assisted SERS analysis
 """
 
 from src.utils import read_spectra_train
+from src.utils import spectra_normalization
 
 def train_model(data_dir, model_dir):
     """
@@ -17,3 +18,10 @@ def train_model(data_dir, model_dir):
     print(f"Raman Shift shape: {Raman_Shift.shape}")
     print(f"Intensity shape: {Intensity.shape}")
     print("Data loaded successfully.")
+
+    # Data normalization
+    Intensity_norm = spectra_normalization(Raman_Shift, Intensity, 
+                                           peak_position=1480, peak_range=20, plot=True)
+    print("Data normalization completed.")
+
+    # Build Identification Model (Model 1)

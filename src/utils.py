@@ -4,6 +4,7 @@ Utility functions for SERS data processing and analysis
 import os
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 def read_spectra_train(directory):
     """
@@ -48,3 +49,39 @@ def read_spectra_train(directory):
 
     return Raman_Shift, Intensity, Category, Concentration
 
+
+def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_range = 20, plot = False):
+    """
+    Normalize SERS spectra based on a specific peak intensity.
+    
+    Args:
+        Raman_Shift (np.ndarray): Array of Raman shift values.
+        Intensity (np.ndarray): 2D array of intensity values (samples x features).
+        peak_position (int): The Raman shift position of the peak to normalize against.
+        peak_range (int): The range around the peak position to consider for normalization.
+    
+    Returns:
+        np.ndarray: Normalized intensity array.
+    """
+    peak_indices = np.where((Raman_Shift >= peak_position - peak_range) & (Raman_Shift <= peak_position + peak_range))[0]
+       
+    normalized_Intensity = Intensity.copy()
+    
+    for i in range(Intensity.shape[0]):
+        peak_intensity = np.max(Intensity[i, peak_indices])
+        if peak_intensity != 0:
+            normalized_Intensity[i, :] = Intensity[i, :] / peak_intensity
+        else:
+            normalized_Intensity[i, :] = Intensity[i, :]
+    
+    if plot:
+        plt.figure(figsize=(10, 6))
+        for i in range(min(5, Intensity.shape[0])):  # Plot first 5 spectra for demonstration
+            plt.plot(Raman_Shift, normalized_Intensity[i, :], label=f'Spectrum {i+1}')
+        plt.xlabel('Raman Shift (cm⁻¹)')
+        plt.ylabel('Normalized Intensity')
+        plt.title('Normalized SERS Spectra')
+        plt.legend()
+        plt.show()
+        
+    return normalized_Intensity
