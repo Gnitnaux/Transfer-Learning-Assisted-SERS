@@ -1,0 +1,3 @@
+# Place training data files here
+# Each subfolder should contain CSV files with Raman spectroscopy data
+# Format: [Raman Shift, Intensity]

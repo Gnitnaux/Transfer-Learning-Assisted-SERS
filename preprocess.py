@@ -107,13 +107,13 @@ def process_single_spectrum(data, window_length=7, polyorder=3, lambda_val=1e6, 
     
     # Step 1: Apply SG filtering
     # Stack current spectrum with reference for processing
-    merge1 = np.row_stack((y, x))
+    merge1 = np.vstack((y, x))
     sg_result = SG(merge1, window_length, polyorder)
     sg_filtered = sg_result[0]  # Take the first row as SG filtered result
     
     # Step 2: Apply AirPLS baseline correction
     # Stack SG filtered result with reference
-    merge2 = np.row_stack((sg_filtered, x))
+    merge2 = np.vstack((sg_filtered, x))
     
     # Apply AirPLS to both rows
     data_AirPLS = merge2.copy()
