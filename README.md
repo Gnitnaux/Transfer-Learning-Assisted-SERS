@@ -1,6 +1,6 @@
 # Transfer-Learning-Assisted-SERS
 
-Transfer learning strategy for catecholamine quantification in mixture
+Transfer learning strategy for catecholamine quantification in mixture, motivated by Angew. Chem. Int. Ed. 2025, 64, e202508717 (doi.org/10.1002/anie).202508717
 
 ## Project Structure
 
@@ -27,15 +27,6 @@ Transfer-Learning-Assisted-SERS/
 
 ## Getting Started
 
-### Prerequisites
-
-- Python 3.7+
-- Required packages (install as needed):
-  - numpy
-  - pandas
-  - scikit-learn
-  - tensorflow/pytorch (for deep learning models)
-
 ### Installation
 
 1. Clone the repository:
@@ -46,8 +37,7 @@ cd Transfer-Learning-Assisted-SERS
 
 2. Install dependencies:
 ```bash
-pip install numpy pandas scikit-learn
-# Add other dependencies as needed
+pip install -r requirements.txt
 ```
 
 ## Usage
@@ -62,9 +52,6 @@ python main.py --mode preprocess --data-dir data/raw --output-dir data/preproces
 
 # Run training
 python main.py --mode train --data-dir data/preprocessed --model-dir models
-
-# Run evaluation
-python main.py --mode evaluate --model-dir models
 
 # Run prediction
 python main.py --mode predict --model-dir models
@@ -89,7 +76,7 @@ python preprocess.py --data-dir data/raw --output-dir data/preprocessed
 ## Directory Descriptions
 
 ### data/
-- **raw/**: Store your raw SERS data files here (CSV, TXT, or other formats)
+- **raw/**: Store your raw SERS data files here (CSV format, with 2 columns `[Raman shift, Intensity]`)
 - **preprocessed/**: Preprocessed and normalized data will be saved here
 
 ### models/
@@ -111,13 +98,7 @@ Contains all custom functions and detailed training code:
 
 ### Data Processing Pipeline
 
-1. **Data Loading**: Load raw SERS data from `data/raw/`
-2. **Data Cleaning**: Remove outliers and handle missing values
-3. **Normalization**: Apply appropriate normalization techniques
-4. **Feature Extraction**: Extract relevant spectral and statistical features
-5. **Model Training**: Train transfer learning models
-6. **Evaluation**: Evaluate model performance
-7. **Prediction**: Make predictions on new data
+
 
 ## Contributing
 
