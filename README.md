@@ -54,36 +54,13 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Quick Start Example
-
-Here's a complete workflow from data organization to preprocessing.
+### Data Preparation
 
 The folder name (label) in train should be `[DA/E/NE]_[XX]uM_[Index]`
 The folder name (label) in test should be `[DA]uM_[E]uM_[NE]uM_[Index]`
 
-```bash
-# 1. Organize your data
-# Place your CSV files in the following structure:
-# data/raw/train/DA_1uM_1/sample1.csv
-# data/raw/train/DA_2uM_1/sample2.csv
-# data/raw/train/DA_3uM_1/sample1.csv
-# data/raw/test/2uM_6uM_8uM_1/sample1.csv
-# data/raw/test/1uM_3uM_10uM_1/sample1.csv
+prepare all the data as the structure below
 
-# 2. Run preprocessing with default parameters
-python preprocess.py
-
-# 3. Check the output
-# Preprocessed files will be in:
-# data/preprocessed/train/DA_1uM_1/processed_sample1.csv
-# data/preprocessed/train/DA_2uM_1/processed_class1_mean.csv
-# data/preprocessed/test/2uM_6uM_8uM_1/processed_sample1.csv
-# etc.
-```
-
-### Data Organization
-
-Before preprocessing, organize your data as follows:
 
 ```
 data/raw/
