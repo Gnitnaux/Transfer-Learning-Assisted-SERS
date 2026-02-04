@@ -4,6 +4,7 @@ Training module for Transfer Learning Assisted SERS analysis
 
 from src.utils import read_spectra_train
 from src.utils import spectra_normalization
+from src.model import RF_Identification_Train
 
 def train_model(data_dir, model_dir):
     """
@@ -21,7 +22,11 @@ def train_model(data_dir, model_dir):
 
     # Data normalization
     Intensity_norm = spectra_normalization(Raman_Shift, Intensity, 
-                                           peak_position=1480, peak_range=20, plot=True)
+                                           peak_position=1082, peak_range=30, plot=True)
     print("Data normalization completed.")
 
     # Build Identification Model (Model 1)
+    DA_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, 'DA', model_dir, plot=True)
+    E_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, 'E', model_dir, plot=True)
+    NE_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, 'NE', model_dir, plot=True)
+    print("Identification models trained successfully.")

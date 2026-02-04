@@ -25,7 +25,8 @@ def read_spectra_train(directory):
                 file_path = os.path.join(folder_path, file)
                 if file.endswith('.csv'):
                     data = pd.read_csv(file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')
-                    spectra_data.append(data)
+                    data_cut = data[(data['Raman Shift'] >= 400) & (data['Raman Shift'] <= 2000)]
+                    spectra_data.append(data_cut)
             data_dict[folder] = spectra_data
 
     # data reshape
@@ -73,15 +74,19 @@ def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_ran
             normalized_Intensity[i, :] = Intensity[i, :] / peak_intensity
         else:
             normalized_Intensity[i, :] = Intensity[i, :]
+
+    # min-max scaling to [0, 1]
+    min_vals = np.min(normalized_Intensity, axis=1, keepdims=True)
+    max_vals = np.max(normalized_Intensity, axis=1, keepdims=True)
+    normalized_Intensity = (normalized_Intensity - min_vals) / (max_vals - min_vals + 1e-8)
     
     if plot:
         plt.figure(figsize=(10, 6))
-        for i in range(min(5, Intensity.shape[0])):  # Plot first 5 spectra for demonstration
+        for i in range(Intensity.shape[0]):
             plt.plot(Raman_Shift, normalized_Intensity[i, :], label=f'Spectrum {i+1}')
         plt.xlabel('Raman Shift (cm⁻¹)')
         plt.ylabel('Normalized Intensity')
         plt.title('Normalized SERS Spectra')
-        plt.legend()
         plt.show()
         
     return normalized_Intensity

@@ -56,7 +56,7 @@ pip install -r requirements.txt
 
 ### Data Preparation
 
-The folder name (label) in train should be `[DA/E/NE]_[XX]uM_[Index]`
+The folder name (label) in train should be `[DA/E/NE]_[XX]uM_[Index]`, specially, name the background 'BA_0uM_Index'
 The folder name (label) in test should be `[DA]uM_[E]uM_[NE]uM_[Index]`
 
 prepare all the data as the structure below
