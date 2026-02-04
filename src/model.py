@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 import joblib
 
@@ -116,4 +117,39 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, CA, model_dir, plo
         plt.show()
 
     return payload
+
+def RF_Identification_Predict(Raman_Shift, Intensity, CA, model_dir, plot = False, labels = None):
+    """
+    Predict using trained Random Forest model to identify pure CA from blank SERS spectra.
+    Args:
+        Raman_Shift (np.ndarray): Array of Raman shift values.
+        Intensity (np.ndarray): 2D array of intensity values (samples x features).
+        CA (str): Target Molecule.
+        model_dir (str): Path to the trained model.
+        plot (bool): Whether to plot confusion matrix.
+        lables (np.ndarray): True labels for the samples (optional, for plotting confusion matrix).
+    Returns:
+        np.ndarray: Predictions (0 or 1) for each sample.
+        np.ndarray: Probabilities for class 1 (CA) for each sample.
+    """
+    model_path = os.path.join(model_dir, f"rf_identification_{CA}.joblib")
+    payload = joblib.load(model_path)
+    model = payload['model']
+    feature_indices = payload['feature_indices']
+
+    X_selected = Intensity[:, feature_indices]
+    predictions = model.predict(X_selected)
+    probabilities = model.predict_proba(X_selected)[:, 1]  # Probability of class 1 (CA)
+
+    if plot and labels is not None:
+        cm = confusion_matrix(labels, predictions)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[f'Not {CA}', CA])
+        disp.plot(cmap=plt.cm.Blues)
+        plt.title(f'Confusion Matrix for {CA} Identification')
+        plt.show()
+
+    return predictions, probabilities
+
+
+
 

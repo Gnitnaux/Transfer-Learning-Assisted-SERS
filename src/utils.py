@@ -50,6 +50,50 @@ def read_spectra_train(directory):
 
     return Raman_Shift, Intensity, Category, Concentration
 
+def read_spectra_predict(directory):
+    """
+    Read and preprocess SERS spectral data from the specified directory for prediction.
+    Args:
+        directory (str): Path to the directory containing spectral data folders.
+    Returns:
+        tuple: (Raman_Shift, Intensity, Concentrations)
+    """
+
+    # read data from directory
+    data_dict = {}
+    for folder in os.listdir(directory):
+        folder_path = os.path.join(directory, folder)
+        if os.path.isdir(folder_path):
+            spectra_data = []
+            for file in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, file)
+                if file.endswith('.csv'):
+                    data = pd.read_csv(file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')
+                    data_cut = data[(data['Raman Shift'] >= 400) & (data['Raman Shift'] <= 2000)]
+                    spectra_data.append(data_cut)
+            data_dict[folder] = spectra_data
+
+    # data reshape
+    # predict data name: [DA]uM_[E]uM_[NE]uM_[replicate]
+    Intensity_list = []
+    Concentration_list = []
+    Raman_Shift = None
+
+    for folder, spectra in data_dict.items():
+        for sp in spectra:
+            if Raman_Shift is None:
+                Raman_Shift = sp['Raman Shift'].values
+            Intensity_list.append(sp['Intensity'].values)
+            DA_con = (folder.split('_')[0]).split('u')[0]
+            E_con = (folder.split('_')[1]).split('u')[0]
+            NE_con = (folder.split('_')[2]).split('u')[0]
+            Concentration_list.append([float(DA_con), float(E_con), float(NE_con)]) 
+
+    Intensity = np.array(Intensity_list)
+    Concentrations = np.array(Concentration_list, dtype=float)
+
+    return Raman_Shift, Intensity, Concentrations
+
 
 def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_range = 20, plot = False):
     """

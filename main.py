@@ -9,6 +9,7 @@ import sys
 import os
 from pathlib import Path
 from src.train import train_model
+from src.predict import test_Identification_Model
 
 # Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -23,7 +24,7 @@ def main():
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["train", "predict"],
+        choices=["train", "predict", "test_IdModel"],
         default="train",
         help="Operation mode: train or predict"
     )
@@ -61,6 +62,11 @@ def main():
         print("\nPrediction mode selected.")
         print("Prediction functionality to be implemented in src/ directory")
         # TODO: Import and call prediction function from src/
+
+    elif args.mode == "test_IdModel":
+        print("\nTesting Identification Model mode selected.")
+        test_Identification_Model(os.path.join(args.data_dir, 'test'), args.model_dir)
+
     
     print("\nDone!")
 
