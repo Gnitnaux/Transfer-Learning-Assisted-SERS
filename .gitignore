@@ -1,4 +1,6 @@
 # Data files
+visualization/*
+!visualization/.gitkeep
 data/raw/*
 !data/raw/.gitkeep
 !data/raw/train/

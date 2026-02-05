@@ -10,6 +10,9 @@ import os
 from pathlib import Path
 from src.train import train_model
 from src.predict import test_Identification_Model
+from src.train import test_train_ratio_model
+from src.predict import test_Ratio_Model
+from src.predict import Ratio_prediction_test
 
 # Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -24,7 +27,7 @@ def main():
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["train", "predict", "test_IdModel"],
+        choices=["train", "predict", "test", "test_IdModel", "test_RatioModel_train", "test_RatioModel_predict"],
         default="train",
         help="Operation mode: train or predict"
     )
@@ -62,12 +65,24 @@ def main():
         print("\nPrediction mode selected.")
         print("Prediction functionality to be implemented in src/ directory")
         # TODO: Import and call prediction function from src/
+    
+    elif args.mode == "test":
+        print("\nTesting mode selected.")
+        Ratio_prediction_test(os.path.join(args.data_dir, 'test'), args.model_dir)
 
     elif args.mode == "test_IdModel":
         print("\nTesting Identification Model mode selected.")
         test_Identification_Model(os.path.join(args.data_dir, 'test'), args.model_dir)
 
-    
+    elif args.mode == "test_RatioModel_train":
+        print("\nTesting Ratio Model on training data mode selected.")
+        test_train_ratio_model(os.path.join(args.data_dir, 'train'), args.model_dir)
+
+    elif args.mode == "test_RatioModel_predict":
+        # the test is on train set
+        print("\nTesting Ratio Model on prediction data mode selected.")
+        test_Ratio_Model(os.path.join(args.data_dir, 'train'), args.model_dir)
+        
     print("\nDone!")
 
 
