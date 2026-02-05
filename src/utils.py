@@ -131,6 +131,7 @@ def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_ran
         plt.xlabel('Raman Shift (cm⁻¹)')
         plt.ylabel('Normalized Intensity')
         plt.title('Normalized SERS Spectra')
+        plt.savefig('visualization/Normalized_SERS_Spectra.png')
         plt.show()
         
     return normalized_Intensity

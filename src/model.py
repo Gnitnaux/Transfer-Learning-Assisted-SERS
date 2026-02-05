@@ -114,6 +114,7 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, CA, model_dir, plo
         plt.ylabel('Intensity')
         plt.title(f'Filtered SERS Spectra and Top Features for {CA} Identification')
         plt.legend()
+        plt.savefig(f'visualization/IdentificationModel_{CA}_Top_Features.png')
         plt.show()
 
     return payload
@@ -146,6 +147,7 @@ def RF_Identification_Predict(Intensity, CA, model_dir, plot = False, labels = N
         disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[f'Not {CA}', CA])
         disp.plot(cmap=plt.cm.Blues)
         plt.title(f'Confusion Matrix for {CA} Identification')
+        plt.savefig(f'visualization/Identification_{CA}_Confusion_Matrix.png')
         plt.show()
 
     return predictions, probabilities
@@ -261,6 +263,7 @@ def RF_Ratio_Train(Raman_Shift, Intensity, Category, CAs, model_dir, plot = Fals
         plt.ylabel('Intensity')
         plt.title(f'Filtered SERS Spectra and Top Features for {CAs} Identification')
         plt.legend()
+        plt.savefig(f'visualization/RatioModel_{"-".join(CAs)}_Top_Features.png')
         plt.show()
 
     return payload   
@@ -302,6 +305,7 @@ def RF_Ratio_Predict(Intensity, CAs, model_dir, plot = False, labels = None):
         disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=CAs)
         disp.plot(cmap=plt.cm.Blues)
         plt.title(f'Confusion Matrix for {"-".join(CAs)} Ratio Prediction')
+        plt.savefig(f'visualization/Ratio_Prediction_{"-".join(CAs)}_Confusion_Matrix.png')
         plt.show()
 
     return predictions, probabilities
