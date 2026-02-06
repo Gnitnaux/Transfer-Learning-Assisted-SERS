@@ -28,7 +28,11 @@ Transfer-Learning-Assisted-SERS/
 ├── src/                        # Source code directory
 │   ├── __init__.py            # Package initialization
 │   ├── model.py               # Model definitions and training functions
-│   └── utils.py               # Utility functions
+│   ├── train.py               # Functions for training
+|   ├── predict.py             # Functions for rediction
+|   └── utils.py               # Utility functions
+|
+├── visualization/             # Visualized png storage
 │
 ├── main.py                     # Main program interface
 ├── preprocess.py              # Data preprocessing program
@@ -131,7 +135,10 @@ Store trained models here. Models will be saved with descriptive names including
 Contains all custom functions and detailed training code:
 - **model.py**: Transfer learning model definitions, training, and evaluation functions
 - **utils.py**: Utility functions for data validation, metrics calculation, and configuration management
-- **__init__.py**: Package initialization
+- **\_\_init\_\_.py**: Package initialization
+
+### visualization
+Store the visualizitions generated while running with `.png` format
 
 
 ## Contributing
