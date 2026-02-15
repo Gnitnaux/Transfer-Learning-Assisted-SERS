@@ -554,8 +554,8 @@ Click the "Start" button to continue...
             return
         
         if not self.prefix_name.get():
-            messagebox.showerror("Error", "Please enter a file prefix!")
-            return
+            #no prefix, then set prefix to empty string
+            self.prefix_name.set("")
         
         try:
             # Save processed data

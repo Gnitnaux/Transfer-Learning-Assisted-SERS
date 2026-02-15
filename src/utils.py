@@ -94,6 +94,46 @@ def read_spectra_predict(directory):
 
     return Raman_Shift, Intensity, Concentrations
 
+def read_spectra_unknown(directory):
+    """
+    Read and preprocess unknown SERS spectral data from the specified directory.
+    Args:
+        directory (str): Path to the directory containing spectral data folders.
+    Returns:
+        tuple: (Raman_Shift, Intensity, Labels)
+    """
+
+    # read data from directory
+    data_dict = {}
+    for folder in os.listdir(directory):
+        folder_path = os.path.join(directory, folder)
+        if os.path.isdir(folder_path):
+            spectra_data = []
+            for file in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, file)
+                if file.endswith('.csv'):
+                    data = pd.read_csv(file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')
+                    data_cut = data[(data['Raman Shift'] >= 400) & (data['Raman Shift'] <= 2000)]
+                    spectra_data.append(data_cut)
+            data_dict[folder] = spectra_data
+
+    # data reshape
+    # predict data name: [DA]uM_[E]uM_[NE]uM_[replicate]
+    Intensity_list = []
+    Label_list = []
+    Raman_Shift = None
+
+    for folder, spectra in data_dict.items():
+        for sp in spectra:
+            if Raman_Shift is None:
+                Raman_Shift = sp['Raman Shift'].values
+            Intensity_list.append(sp['Intensity'].values)
+            Label_list.append(folder)
+
+    Intensity = np.array(Intensity_list)
+    Labels = np.array(Label_list, dtype=str)
+
+    return Raman_Shift, Intensity, Labels
 
 def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_range = 20, plot = False):
     """
@@ -132,6 +172,9 @@ def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_ran
         plt.ylabel('Normalized Intensity')
         plt.title('Normalized SERS Spectra')
         plt.savefig('visualization/Normalized_SERS_Spectra.png')
-        plt.show()
+        plt.show(block = False)
+        # wait for 5s then close the plot
+        plt.pause(5)
+        plt.close()
         
     return normalized_Intensity

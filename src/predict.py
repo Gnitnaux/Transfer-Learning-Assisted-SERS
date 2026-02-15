@@ -215,7 +215,9 @@ def Ratio_prediction_test(data_dir, model_dir):
     disp.plot(cmap=plt.cm.Blues, xticks_rotation='vertical')
     plt.title('Confusion Matrix for Molecule Identification')
     plt.savefig('visualization/Ratio_predction_test-Identification_Confusion_Matrix.png')
-    plt.show()
+    plt.show(block = False)
+    plt.pause(5)
+    plt.close()
         
     # plot pred-real pairs in 3D scatter plot, line the pair togther
     fig = plt.figure()
@@ -232,6 +234,8 @@ def Ratio_prediction_test(data_dir, model_dir):
     ax.set_title('Predicted vs Real Concentration Ratios')
     ax.legend()
     plt.savefig('visualization/Ratio_predction_test-Predicted_vs_Real_Ratios.png')
-    plt.show()
+    plt.show(block = False)
+    plt.pause(5)
+    plt.close()
 
     print("Ratio prediction completed.")

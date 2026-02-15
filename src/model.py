@@ -70,7 +70,7 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, CA, model_dir, plo
     avg_f1 = float(np.mean(f1_scores))
     avg_feature_importances = np.mean(np.vstack(feature_importances), axis=0)
 
-    top_k = min(50, n_features)
+    top_k = min(100, n_features)
     top_feature_indices = np.argsort(avg_feature_importances)[::-1][:top_k]
 
     X_selected = Intensity_filtered[:, top_feature_indices]
@@ -115,7 +115,9 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, CA, model_dir, plo
         plt.title(f'Filtered SERS Spectra and Top Features for {CA} Identification')
         plt.legend()
         plt.savefig(f'visualization/IdentificationModel_{CA}_Top_Features.png')
-        plt.show()
+        plt.show(block = False)
+        plt.pause(5)
+        plt.close()
 
     return payload
 
@@ -148,7 +150,9 @@ def RF_Identification_Predict(Intensity, CA, model_dir, plot = False, labels = N
         disp.plot(cmap=plt.cm.Blues)
         plt.title(f'Confusion Matrix for {CA} Identification')
         plt.savefig(f'visualization/Identification_{CA}_Confusion_Matrix.png')
-        plt.show()
+        plt.show(block = False)
+        plt.pause(5)
+        plt.close()
 
     return predictions, probabilities
 
@@ -215,7 +219,7 @@ def RF_Ratio_Train(Raman_Shift, Intensity, Category, CAs, model_dir, plot = Fals
     avg_f1 = float(np.mean(f1_scores))
     avg_feature_importances = np.mean(np.vstack(feature_importances), axis=0)
 
-    top_k = min(50, n_features)
+    top_k = min(100, n_features)
     top_feature_indices = np.argsort(avg_feature_importances)[::-1][:top_k]
 
     X_selected = Intensity_filtered[:, top_feature_indices]
@@ -264,7 +268,9 @@ def RF_Ratio_Train(Raman_Shift, Intensity, Category, CAs, model_dir, plot = Fals
         plt.title(f'Filtered SERS Spectra and Top Features for {CAs} Identification')
         plt.legend()
         plt.savefig(f'visualization/RatioModel_{"-".join(CAs)}_Top_Features.png')
-        plt.show()
+        plt.show(block = False)
+        plt.pause(5)
+        plt.close()
 
     return payload   
 
@@ -306,7 +312,9 @@ def RF_Ratio_Predict(Intensity, CAs, model_dir, plot = False, labels = None):
         disp.plot(cmap=plt.cm.Blues)
         plt.title(f'Confusion Matrix for {"-".join(CAs)} Ratio Prediction')
         plt.savefig(f'visualization/Ratio_Prediction_{"-".join(CAs)}_Confusion_Matrix.png')
-        plt.show()
+        plt.show(block = False)
+        plt.pause(5)
+        plt.close()
 
     return predictions, probabilities
 
