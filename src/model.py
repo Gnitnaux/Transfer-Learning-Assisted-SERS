@@ -10,13 +10,14 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 import joblib
 
-def RF_Identification_Train(Raman_Shift, Intensity, Category, CA, model_dir, plot = False):
+def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA, model_dir, plot = False):
     """
     Train Random Forest model to identify pure CA from blank SERS spectra.
     Args:
         Raman_Shift (np.ndarray): Array of Raman shift values.
         Intensity (np.ndarray): 2D array of intensity values (samples x features).
         Category (np.ndarray): Array of category labels for each sample.
+        Concentration (np.ndarray): Array of concentration values for each sample.
         CA (str): Target Molecule.
         model_dir (str): Directory to save the trained model.
         plot (bool): Whether to plot feature importances.
@@ -29,6 +30,7 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, CA, model_dir, plo
     filter_indices = (Category == CA) | (Category == 'BA')
     Intensity_filtered = Intensity[filter_indices]
     Category_filtered = Category[filter_indices]
+    Concentration_filtered = Concentration[filter_indices]
     Labels = (Category_filtered == CA).astype(int)  # 1 for CA, 0 for BA
 
     n_features = Intensity_filtered.shape[1]
@@ -99,11 +101,11 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, CA, model_dir, plo
     if plot:
         plt.figure(figsize=(10, 6))
         # plot filtered spectra with feature importance bars
-        # select one spectrum wich is not BA
-        sample_index = np.where(Category_filtered == CA)[0][0]
+        # select one spectrum wich is not BA with the highest concentration of CA
+        sample_index = np.where((Category_filtered == CA) & (Concentration_filtered == np.max(Concentration_filtered[Category_filtered == CA])))[0][0]
         plt.plot(Raman_Shift, Intensity_filtered[sample_index, :], label=f'normalized spectum of {CA}')
         # select one spectrum which is Background
-        sample_index_ba = np.where(Category_filtered == 'BA')[0][0]
+        sample_index_ba = np.where((Category_filtered == 'BA') & (Concentration_filtered == np.max(Concentration_filtered[Category_filtered == 'BA'])))[0][0]
         plt.plot(Raman_Shift, Intensity_filtered[sample_index_ba, :], label='normalized spectum of Background')
         # scale feature importance to 0-1
         scaled_importances = avg_feature_importances / np.max(avg_feature_importances)
@@ -156,14 +158,15 @@ def RF_Identification_Predict(Intensity, CA, model_dir, plot = False, labels = N
 
     return predictions, probabilities
 
-def RF_Ratio_Train(Raman_Shift, Intensity, Category, CAs, model_dir, plot = False):
+def RF_Ratio_Train(Raman_Shift, Intensity, Category, Concentration, CAs, model_dir, plot = False):
     """
     Train Random Forest model to predict concentration ratios between two CAs.
     Args:
         Raman_Shift (np.ndarray): Array of Raman shift values.
         Intensity (np.ndarray): 2D array of intensity values (samples x features).
         Category (np.ndarray): Array of category labels for each sample.
-        CAs (list): List of st least two target Molecules [CA1, CA2, ...].
+        Concentration (np.ndarray): Array of concentration values for each sample.
+        CAs (list): List of at least two target Molecules [CA1, CA2, ...].
         model_dir (str): Directory to save the trained model.
         plot (bool): Whether to plot feature importances.
     Returns:
@@ -178,6 +181,7 @@ def RF_Ratio_Train(Raman_Shift, Intensity, Category, CAs, model_dir, plot = Fals
     filter_indices = np.isin(Category, CAs)
     Intensity_filtered = Intensity[filter_indices]
     Category_filtered = Category[filter_indices]
+    Concentration_filtered = Concentration[filter_indices]
     Labels = np.array([CAs.index(cat) for cat in Category_filtered])  # 0 for CA1, 1 for CA2, ...
 
     n_features = Intensity_filtered.shape[1]
@@ -253,9 +257,9 @@ def RF_Ratio_Train(Raman_Shift, Intensity, Category, CAs, model_dir, plot = Fals
     if plot:
         plt.figure(figsize=(10, 6))
         # plot filtered spectra with feature importance bars
-        # select one spectrum for each category
+        # select one spectrum for each category with the highest concentration
         for ca in CAs:
-            sample_index = np.where(Category_filtered == ca)[0][0]
+            sample_index = np.where((Category_filtered == ca) & (Concentration_filtered == np.max(Concentration_filtered[Category_filtered == ca])))[0][0]
             plt.plot(Raman_Shift, Intensity_filtered[sample_index, :], label=f'normalized spectrum of {ca}')
 
         # scale feature importance to 0-1
