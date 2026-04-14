@@ -25,7 +25,7 @@ def read_spectra_train(directory):
                 file_path = os.path.join(folder_path, file)
                 if file.endswith('.csv'):
                     data = pd.read_csv(file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')
-                    data_cut = data[(data['Raman Shift'] >= 400) & (data['Raman Shift'] <= 2000)]
+                    data_cut = data[(data['Raman Shift'] >= 400) & (data['Raman Shift'] <= 1650)]
                     spectra_data.append(data_cut)
             data_dict[folder] = spectra_data
 
@@ -69,7 +69,7 @@ def read_spectra_predict(directory):
                 file_path = os.path.join(folder_path, file)
                 if file.endswith('.csv'):
                     data = pd.read_csv(file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')
-                    data_cut = data[(data['Raman Shift'] >= 400) & (data['Raman Shift'] <= 2000)]
+                    data_cut = data[(data['Raman Shift'] >= 400) & (data['Raman Shift'] <= 1650)]
                     spectra_data.append(data_cut)
             data_dict[folder] = spectra_data
 
@@ -135,7 +135,7 @@ def read_spectra_unknown(directory):
 
     return Raman_Shift, Intensity, Labels
 
-def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_range = 20, plot = False):
+def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_range = 20, plot = False, mode = 'train'):
     """
     Normalize SERS spectra based on a specific peak intensity.
     
@@ -171,7 +171,7 @@ def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_ran
         plt.xlabel('Raman Shift (cm⁻¹)')
         plt.ylabel('Normalized Intensity')
         plt.title('Normalized SERS Spectra')
-        plt.savefig('visualization/Normalized_SERS_Spectra.png')
+        plt.savefig(f'visualization/Normalized_SERS_Spectra_{mode}.png', dpi = 600)
         plt.show(block = False)
         # wait for 5s then close the plot
         plt.pause(5)

@@ -72,7 +72,7 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
     avg_f1 = float(np.mean(f1_scores))
     avg_feature_importances = np.mean(np.vstack(feature_importances), axis=0)
 
-    top_k = min(100, n_features)
+    top_k = min(50, n_features)
     top_feature_indices = np.argsort(avg_feature_importances)[::-1][:top_k]
 
     X_selected = Intensity_filtered[:, top_feature_indices]
@@ -99,27 +99,34 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
     joblib.dump(payload, model_path)
 
     if plot:
-        plt.figure(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(10, 6))
         # plot filtered spectra with feature importance bars
+        # scale feature importance to 0-1
+        max_importance = np.max(avg_feature_importances)
+        scaled_importances = avg_feature_importances / max_importance if max_importance > 0 else avg_feature_importances
+        bar_heights = np.ones(len(top_feature_indices))
+        bar_colors = plt.cm.YlOrRd(0.2 + 0.45 * scaled_importances[top_feature_indices])
+        ax.bar(Raman_Shift[top_feature_indices], bar_heights, width=5, color=bar_colors, label='Top Features', zorder=2)
         # select one spectrum wich is not BA with the highest concentration of CA
         sample_index = np.where((Category_filtered == CA) & (Concentration_filtered == np.max(Concentration_filtered[Category_filtered == CA])))[0][0]
-        plt.plot(Raman_Shift, Intensity_filtered[sample_index, :], label=f'normalized spectum of {CA}')
+        # scale selected spectrum to 0-1 for better visualization with feature importance bars
+        scaled_spectrum = Intensity_filtered[sample_index, :] / np.max(Intensity_filtered[sample_index, :]) \
+            if np.max(Intensity_filtered[sample_index, :]) > 0 else Intensity_filtered[sample_index, :]
+        # Use cool-tone, high-contrast colors to avoid confusion with warm feature bars.
+        ax.plot(Raman_Shift, scaled_spectrum, color='#1F4E79', linewidth=1.8, label=f'{CA}', zorder=4)
         # select one spectrum which is Background
         sample_index_ba = np.where((Category_filtered == 'BA') & (Concentration_filtered == np.max(Concentration_filtered[Category_filtered == 'BA'])))[0][0]
-        plt.plot(Raman_Shift, Intensity_filtered[sample_index_ba, :], label='normalized spectum of Background')
-        # scale feature importance to 0-1
-        scaled_importances = avg_feature_importances / np.max(avg_feature_importances)
-        plt.bar(Raman_Shift[top_feature_indices], 
-                scaled_importances[top_feature_indices], # scale to 0-1
-                width=5, color='red', alpha=0.7, label='Top Features')
-        plt.xlabel('Raman Shift (cm⁻¹)')
-        plt.ylabel('Intensity')
-        plt.title(f'Filtered SERS Spectra and Top Features for {CA} Identification')
-        plt.legend()
-        plt.savefig(f'visualization/IdentificationModel_{CA}_Top_Features.png')
+        scaled_spectrum_ba = Intensity_filtered[sample_index_ba, :] / np.max(Intensity_filtered[sample_index_ba, :]) \
+            if np.max(Intensity_filtered[sample_index_ba, :]) > 0 else Intensity_filtered[sample_index_ba, :]
+        ax.plot(Raman_Shift, scaled_spectrum_ba, color='#00A6D6', linewidth=1.8, linestyle='--', label='Background', zorder=4)
+        ax.set_xlabel('Raman Shift (cm⁻¹)')
+        ax.set_ylabel('Intensity')
+        ax.set_title(f'Filtered SERS Spectra and Top Features for {CA} Identification')
+        ax.legend()
+        fig.savefig(f'visualization/IdentificationModel_{CA}_Top_Features.png', dpi = 600)
         plt.show(block = False)
         plt.pause(5)
-        plt.close()
+        plt.close(fig)
 
     return payload
 
@@ -147,18 +154,19 @@ def RF_Identification_Predict(Intensity, CA, model_dir, plot = False, labels = N
     probabilities = model.predict_proba(X_selected)[:, 1]  # Probability of class 1 (CA)
 
     if plot and labels is not None:
-        cm = confusion_matrix(labels, predictions)
+        # Force binary class order so display labels always match matrix dimensions.
+        cm = confusion_matrix(labels, predictions, labels=[0, 1])
         disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[f'Not {CA}', CA])
         disp.plot(cmap=plt.cm.Blues)
         plt.title(f'Confusion Matrix for {CA} Identification')
-        plt.savefig(f'visualization/Identification_{CA}_Confusion_Matrix.png')
+        plt.savefig(f'visualization/Identification_{CA}_Confusion_Matrix.png', dpi = 600)
         plt.show(block = False)
         plt.pause(5)
         plt.close()
 
     return predictions, probabilities
 
-def RF_Ratio_Train(Raman_Shift, Intensity, Category, Concentration, CAs, model_dir, plot = False):
+def RF_Ratio_Train(Raman_Shift, Intensity, Category, Concentration, CAs, model_dir, plot = False, con = 10):
     """
     Train Random Forest model to predict concentration ratios between two CAs.
     Args:
@@ -169,6 +177,8 @@ def RF_Ratio_Train(Raman_Shift, Intensity, Category, Concentration, CAs, model_d
         CAs (list): List of at least two target Molecules [CA1, CA2, ...].
         model_dir (str): Directory to save the trained model.
         plot (bool): Whether to plot feature importances.
+        con (int): Selected concentration for training.
+
     Returns:
         dict: A dictionary with keys: model, feature_indices, avg_rmse,
               and avg_feature_importances.
@@ -183,6 +193,13 @@ def RF_Ratio_Train(Raman_Shift, Intensity, Category, Concentration, CAs, model_d
     Category_filtered = Category[filter_indices]
     Concentration_filtered = Concentration[filter_indices]
     Labels = np.array([CAs.index(cat) for cat in Category_filtered])  # 0 for CA1, 1 for CA2, ...
+
+    # filter data for selected concentration
+    con_indices = np.isin(Concentration_filtered, [con])
+    Intensity_filtered = Intensity_filtered[con_indices]
+    Category_filtered = Category_filtered[con_indices]
+    Concentration_filtered = Concentration_filtered[con_indices]
+    Labels = Labels[con_indices]
 
     n_features = Intensity_filtered.shape[1]
     n_iterations = 100
@@ -223,7 +240,7 @@ def RF_Ratio_Train(Raman_Shift, Intensity, Category, Concentration, CAs, model_d
     avg_f1 = float(np.mean(f1_scores))
     avg_feature_importances = np.mean(np.vstack(feature_importances), axis=0)
 
-    top_k = min(100, n_features)
+    top_k = min(50, n_features)
     top_feature_indices = np.argsort(avg_feature_importances)[::-1][:top_k]
 
     X_selected = Intensity_filtered[:, top_feature_indices]
@@ -255,26 +272,30 @@ def RF_Ratio_Train(Raman_Shift, Intensity, Category, Concentration, CAs, model_d
     joblib.dump(payload, model_path)
 
     if plot:
-        plt.figure(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(10, 6))
         # plot filtered spectra with feature importance bars
-        # select one spectrum for each category with the highest concentration
-        for ca in CAs:
-            sample_index = np.where((Category_filtered == ca) & (Concentration_filtered == np.max(Concentration_filtered[Category_filtered == ca])))[0][0]
-            plt.plot(Raman_Shift, Intensity_filtered[sample_index, :], label=f'normalized spectrum of {ca}')
-
         # scale feature importance to 0-1
-        scaled_importances = avg_feature_importances / np.max(avg_feature_importances)
-        plt.bar(Raman_Shift[top_feature_indices], 
-                scaled_importances[top_feature_indices], # scale to 0-1
-                width=5, color='red', alpha=0.7, label='Top Features')
-        plt.xlabel('Raman Shift (cm⁻¹)')
-        plt.ylabel('Intensity')
-        plt.title(f'Filtered SERS Spectra and Top Features for {CAs} Identification')
-        plt.legend()
-        plt.savefig(f'visualization/RatioModel_{"-".join(CAs)}_Top_Features.png')
+        max_importance = np.max(avg_feature_importances)
+        scaled_importances = avg_feature_importances / max_importance if max_importance > 0 else avg_feature_importances
+        bar_heights = np.ones(len(top_feature_indices))
+        bar_colors = plt.cm.YlOrRd(0.2 + 0.4 * scaled_importances[top_feature_indices])
+        ax.bar(Raman_Shift[top_feature_indices], bar_heights, width=5, color=bar_colors, label='Top Features', zorder=2)
+        # select one spectrum for each category with the highest concentration
+        line_colors = ['#0B1F3A', '#1B4332', '#4A148C']
+        for idx, ca in enumerate(CAs):
+            sample_index = np.where((Category_filtered == ca) & (Concentration_filtered == np.max(Concentration_filtered[Category_filtered == ca])))[0][0]
+            # scale selected spectrum to 0-1 for better visualization with feature importance bars
+            scaled_spectrum = Intensity_filtered[sample_index, :] / np.max(Intensity_filtered[sample_index, :]) if np.max(Intensity_filtered[sample_index, :]) > 0 else Intensity_filtered[sample_index, :]
+            ax.plot(Raman_Shift, scaled_spectrum, color=line_colors[idx % len(line_colors)], linewidth=1.8, label=f'normalized spectrum of {ca}', zorder=3)
+
+        ax.set_xlabel('Raman Shift (cm⁻¹)')
+        ax.set_ylabel('Intensity')
+        ax.set_title(f'Filtered SERS Spectra and Top Features for {CAs} Identification')
+        ax.legend()
+        fig.savefig(f'visualization/RatioModel_{"-".join(CAs)}_Top_Features.png', dpi = 600)
         plt.show(block = False)
         plt.pause(5)
-        plt.close()
+        plt.close(fig)
 
     return payload   
 
@@ -311,7 +332,8 @@ def RF_Ratio_Predict(Intensity, CAs, model_dir, plot = False, labels = None):
         Labels = np.array([CAs.index(cat) for cat in labels])  # 0 for CA1, 1 for CA2, ...
 
     if plot and Labels is not None:
-        cm = confusion_matrix(Labels, predictions)
+        # Keep all expected classes on axes even if a test subset contains fewer classes.
+        cm = confusion_matrix(Labels, predictions, labels=list(range(len(CAs))))
         disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=CAs)
         disp.plot(cmap=plt.cm.Blues)
         plt.title(f'Confusion Matrix for {"-".join(CAs)} Ratio Prediction')

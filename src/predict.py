@@ -28,7 +28,7 @@ def test_Identification_Model(data_dir, model_dir):
 
     # Data normalization
     Intensity_norm = spectra_normalization(Raman_Shift, Intensity, 
-                                           peak_position=1082, peak_range=30, plot=True)
+                                           peak_position=920, peak_range=20, plot=True, mode = 'test_IDModel')
     print("Prediction data normalization completed.")
 
     # Load and test Identification Model (Model 1)
@@ -57,7 +57,7 @@ def test_Ratio_Model(data_dir, model_dir):
 
     # Data normalization
     Intensity_norm = spectra_normalization(Raman_Shift, Intensity,
-                                           peak_position=1082, peak_range=30, plot=True)
+                                           peak_position=920, peak_range=20, plot=True, mode = 'test_RatioModel')
     print("Data normalization completed.")
 
     # Load and test Ratio Model (Model 2), the test is not to measure ratio but category prediction
@@ -102,7 +102,7 @@ def Ratio_prediction_test(data_dir, model_dir):
 
     # Data normalization
     Intensity_norm = spectra_normalization(Raman_Shift, Intensity, 
-                                           peak_position=1082, peak_range=30, plot=True)
+                                           peak_position=920, peak_range=20, plot=True, mode = 'testRatio_predict')
     print("Prediction data normalization completed.")
 
     ratio_pred = []
@@ -127,9 +127,15 @@ def Ratio_prediction_test(data_dir, model_dir):
         
 
     # Step 1 - Identify present molecules using Identification Models
-    DA_Predictions, DA_Probabilities = RF_Identification_Predict(Intensity_norm, 'DA', model_dir, plot=False)
-    E_Predictions, E_Probabilities = RF_Identification_Predict(Intensity_norm, 'E', model_dir, plot=False)
-    NE_Predictions, NE_Probabilities = RF_Identification_Predict(Intensity_norm, 'NE', model_dir, plot=False)
+    DA_Labels = (Concentrations[:, 0] > 0).astype(int)  # 1 if DA present, else 0
+    DA_Predictions, DA_Probabilities = RF_Identification_Predict(Intensity_norm, 'DA', model_dir, plot=True, labels=DA_Labels)
+    E_Labels = (Concentrations[:, 1] > 0).astype(int)  # 1 if E present, else 0
+    E_Predictions, E_Probabilities = RF_Identification_Predict(Intensity_norm, 'E', model_dir, plot=True, labels=E_Labels)
+    NE_Labels = (Concentrations[:, 2] > 0).astype(int)  # 1 if NE present, else 0
+    NE_Predictions, NE_Probabilities = RF_Identification_Predict(Intensity_norm, 'NE', model_dir, plot=True, labels=NE_Labels)
+
+    print(f"NE: Real labels: {NE_Labels}")
+    print(f"NE: Predicted labels: {NE_Predictions}")
 
     # Step 2 - Predict concentration ratios using Ratio Models
     last_con = []
