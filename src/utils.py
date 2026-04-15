@@ -25,7 +25,7 @@ def read_spectra_train(directory):
                 file_path = os.path.join(folder_path, file)
                 if file.endswith('.csv'):
                     data = pd.read_csv(file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')
-                    data_cut = data[(data['Raman Shift'] >= 400) & (data['Raman Shift'] <= 1650)]
+                    data_cut = data[(data['Raman Shift'] >= 330) & (data['Raman Shift'] <= 1600)]
                     spectra_data.append(data_cut)
             data_dict[folder] = spectra_data
 
@@ -69,7 +69,7 @@ def read_spectra_predict(directory):
                 file_path = os.path.join(folder_path, file)
                 if file.endswith('.csv'):
                     data = pd.read_csv(file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')
-                    data_cut = data[(data['Raman Shift'] >= 400) & (data['Raman Shift'] <= 1650)]
+                    data_cut = data[(data['Raman Shift'] >= 330) & (data['Raman Shift'] <= 1600)]
                     spectra_data.append(data_cut)
             data_dict[folder] = spectra_data
 

@@ -86,6 +86,8 @@ class SpectralProcessorApp:
         self.porder_val = tk.IntVar(value=3)
         self.prefix_name = tk.StringVar(value="t")
         self.save_folder_path = tk.StringVar()
+        self.cut_start = tk.DoubleVar(value=330)
+        self.cut_end = tk.DoubleVar(value=1600)
         
         self.data = None
         self.merge_data = None
@@ -168,6 +170,22 @@ Click the "Start" button to continue...
         
         browse_button = ttk.Button(folder_frame, text="Browse", command=self.browse_folder)
         browse_button.pack(side=tk.LEFT)
+
+        # Cut data range settings
+        cut_frame = ttk.LabelFrame(self.main_frame, text="Cut Data Range (Raman Shift)")
+        cut_frame.pack(pady=10, padx=50, fill=tk.X)
+
+        ttk.Label(cut_frame, text="Start:").grid(row=0, column=0, padx=(10, 5), pady=10, sticky=tk.W)
+        cut_start_entry = ttk.Entry(cut_frame, textvariable=self.cut_start, width=12)
+        cut_start_entry.grid(row=0, column=1, padx=(0, 15), pady=10, sticky=tk.W)
+
+        ttk.Label(cut_frame, text="End:").grid(row=0, column=2, padx=(10, 5), pady=10, sticky=tk.W)
+        cut_end_entry = ttk.Entry(cut_frame, textvariable=self.cut_end, width=12)
+        cut_end_entry.grid(row=0, column=3, padx=(0, 10), pady=10, sticky=tk.W)
+
+        ttk.Label(cut_frame, text="Example: 330 to 1600", foreground="gray").grid(
+            row=1, column=0, columnspan=4, padx=10, pady=(0, 10), sticky=tk.W
+        )
         
         # Button frame
         button_frame = ttk.Frame(self.main_frame)
@@ -184,6 +202,19 @@ Click the "Start" button to continue...
         folder_selected = filedialog.askdirectory()
         if folder_selected:
             self.folder_path.set(folder_selected)
+
+    def get_cut_range(self):
+        """Get and validate UI-provided Raman shift cut range."""
+        try:
+            cut_start = float(self.cut_start.get())
+            cut_end = float(self.cut_end.get())
+        except (ValueError, tk.TclError):
+            raise ValueError("Cut data range must be numeric values.")
+
+        if cut_start >= cut_end:
+            raise ValueError("Cut data range is invalid: start must be less than end.")
+
+        return cut_start, cut_end
     
     def load_data_for_preview(self):
         """Load data for preview"""
@@ -192,6 +223,8 @@ Click the "Start" button to continue...
             return
         
         try:
+            cut_start, cut_end = self.get_cut_range()
+
             # Get first folder in directory
             all_folders = [f for f in os.listdir(self.folder_path.get()) if os.path.isdir(os.path.join(self.folder_path.get(), f))]
             if not all_folders:
@@ -205,8 +238,17 @@ Click the "Start" button to continue...
             all_files = os.listdir(first_file_path)
             csv_files = [f for f in all_files if f.lower().endswith('.csv')]
             first_file_path = os.path.join(first_file_path, csv_files[0])
-            self.data = pd.read_csv(first_file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')           
-            
+            self.data = pd.read_csv(first_file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')   
+
+            # Cut data by user-defined Raman shift range
+            self.data = self.data[
+                (self.data['Raman Shift'] >= cut_start) & (self.data['Raman Shift'] <= cut_end)
+            ]
+
+            if self.data.empty:
+                messagebox.showerror("Error", "No data points remain after cut range filtering. Please adjust range.")
+                return
+
             if self.data.shape[1] <= 1:
                 messagebox.showerror("Error", "Files need at least 2 columns of data for processing!")
                 return
@@ -457,6 +499,7 @@ Click the "Start" button to continue...
             polyorder = self.polyorder.get()
             lambda_val = self.lambda_val.get()
             porder_val = self.porder_val.get()
+            cut_start, cut_end = self.get_cut_range()
             
             # Ensure window length is odd
             if window_length % 2 == 0:
@@ -468,7 +511,16 @@ Click the "Start" button to continue...
                 calculate_mean_spec = pd.DataFrame()
                 for file in os.listdir(folder_path):
                     file_path = os.path.join(folder_path, file)
-                    data = pd.read_csv(file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')       
+                    data = pd.read_csv(file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK') 
+
+                    # Cut data by user-defined Raman shift range
+                    data = data[(data['Raman Shift'] >= cut_start) & (data['Raman Shift'] <= cut_end)]
+
+                    if data.empty:
+                        raise ValueError(
+                            f"No data points remain after cut range filtering in file: {file}. "
+                            "Please adjust range settings."
+                        )
                 
                     # Process according to logic
                     data_process = data.copy()

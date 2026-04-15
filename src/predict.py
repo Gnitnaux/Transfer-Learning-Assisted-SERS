@@ -39,6 +39,16 @@ def test_Identification_Model(data_dir, model_dir):
     NE_Labels = (Concentrations[:, 2] > 0).astype(int)  # 1 if NE present, else 0
     NE_Predictions, NE_Probabilities = RF_Identification_Predict(Intensity_norm, 'NE', model_dir, plot=True, labels=NE_Labels)
     print("Identification models tested successfully.")
+    # plot probability distributions for each molecule in one plot
+    # plt.figure(figsize=(10, 6))
+    # plt.hist(DA_Probabilities, bins=20, alpha=0.5, label='DA Probability', color='blue')
+    # plt.hist(E_Probabilities, bins=20, alpha=0.5, label='E Probability', color='orange')
+    # plt.hist(NE_Probabilities, bins=20, alpha=0.5, label='NE Probability', color='green')
+    # plt.xlabel('Predicted Probability')
+    # plt.ylabel('Frequency')
+    # plt.title('Predicted Probability Distributions for DA, E, and NE')
+    # plt.legend()
+    # plt.show()
 
 
 def test_Ratio_Model(data_dir, model_dir):

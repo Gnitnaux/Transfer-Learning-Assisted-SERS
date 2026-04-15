@@ -27,13 +27,9 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
     """    
     
     # filter data for category == CA or 'BA'
-    filter_indices = (Category == CA) | (Category == 'BA')
-    Intensity_filtered = Intensity[filter_indices]
-    Category_filtered = Category[filter_indices]
-    Concentration_filtered = Concentration[filter_indices]
-    Labels = (Category_filtered == CA).astype(int)  # 1 for CA, 0 for BA
+    Labels = (Category == CA).astype(int)  # 1 for CA, 0 for others
 
-    n_features = Intensity_filtered.shape[1]
+    n_features = Intensity.shape[1]
     n_iterations = 100
     test_size = 0.25
 
@@ -43,7 +39,7 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
 
     for i in range(n_iterations):
         X_train, X_test, y_train, y_test = train_test_split(
-            Intensity_filtered,
+            Intensity,
             Labels,
             test_size=test_size,
             random_state=42 + i,
@@ -75,7 +71,7 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
     top_k = min(50, n_features)
     top_feature_indices = np.argsort(avg_feature_importances)[::-1][:top_k]
 
-    X_selected = Intensity_filtered[:, top_feature_indices]
+    X_selected = Intensity[:, top_feature_indices]
 
     final_model = RandomForestClassifier(
         n_estimators=1000,
@@ -104,21 +100,19 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
         # scale feature importance to 0-1
         max_importance = np.max(avg_feature_importances)
         scaled_importances = avg_feature_importances / max_importance if max_importance > 0 else avg_feature_importances
-        bar_heights = np.ones(len(top_feature_indices))
+        bar_heights = np.ones(len(top_feature_indices)) * 3
         bar_colors = plt.cm.YlOrRd(0.2 + 0.45 * scaled_importances[top_feature_indices])
         ax.bar(Raman_Shift[top_feature_indices], bar_heights, width=5, color=bar_colors, label='Top Features', zorder=2)
-        # select one spectrum wich is not BA with the highest concentration of CA
-        sample_index = np.where((Category_filtered == CA) & (Concentration_filtered == np.max(Concentration_filtered[Category_filtered == CA])))[0][0]
-        # scale selected spectrum to 0-1 for better visualization with feature importance bars
-        scaled_spectrum = Intensity_filtered[sample_index, :] / np.max(Intensity_filtered[sample_index, :]) \
-            if np.max(Intensity_filtered[sample_index, :]) > 0 else Intensity_filtered[sample_index, :]
-        # Use cool-tone, high-contrast colors to avoid confusion with warm feature bars.
-        ax.plot(Raman_Shift, scaled_spectrum, color='#1F4E79', linewidth=1.8, label=f'{CA}', zorder=4)
-        # select one spectrum which is Background
-        sample_index_ba = np.where((Category_filtered == 'BA') & (Concentration_filtered == np.max(Concentration_filtered[Category_filtered == 'BA'])))[0][0]
-        scaled_spectrum_ba = Intensity_filtered[sample_index_ba, :] / np.max(Intensity_filtered[sample_index_ba, :]) \
-            if np.max(Intensity_filtered[sample_index_ba, :]) > 0 else Intensity_filtered[sample_index_ba, :]
-        ax.plot(Raman_Shift, scaled_spectrum_ba, color='#00A6D6', linewidth=1.8, linestyle='--', label='Background', zorder=4)
+
+        line_colors = ['#0B1F3A', '#1B4332', '#4A148C']
+        for idx, ca in enumerate(['DA', 'E', 'NE']):
+            sample_index = np.where((Category == ca) & (Concentration == np.max(Concentration[Category == ca])))[0][0]
+            # scale selected spectrum to 0-1 for better visualization with feature importance bars
+            scaled_spectrum = Intensity[sample_index, :] / np.max(Intensity[sample_index, :]) \
+                if np.max(Intensity[sample_index, :]) > 0 else Intensity[sample_index, :]
+            scaled_spectrum = scaled_spectrum + idx  # Shift each spectrum up by its index for better visibility
+            ax.plot(Raman_Shift, scaled_spectrum, color=line_colors[idx % len(line_colors)], linewidth=1.8, label=f'normalized spectrum of {ca}', zorder=3)
+        
         ax.set_xlabel('Raman Shift (cm⁻¹)')
         ax.set_ylabel('Intensity')
         ax.set_title(f'Filtered SERS Spectra and Top Features for {CA} Identification')
@@ -277,7 +271,7 @@ def RF_Ratio_Train(Raman_Shift, Intensity, Category, Concentration, CAs, model_d
         # scale feature importance to 0-1
         max_importance = np.max(avg_feature_importances)
         scaled_importances = avg_feature_importances / max_importance if max_importance > 0 else avg_feature_importances
-        bar_heights = np.ones(len(top_feature_indices))
+        bar_heights = np.ones(len(top_feature_indices)) * len(CAs)  # Scale bar heights by number of classes for better visibility
         bar_colors = plt.cm.YlOrRd(0.2 + 0.4 * scaled_importances[top_feature_indices])
         ax.bar(Raman_Shift[top_feature_indices], bar_heights, width=5, color=bar_colors, label='Top Features', zorder=2)
         # select one spectrum for each category with the highest concentration
@@ -285,7 +279,9 @@ def RF_Ratio_Train(Raman_Shift, Intensity, Category, Concentration, CAs, model_d
         for idx, ca in enumerate(CAs):
             sample_index = np.where((Category_filtered == ca) & (Concentration_filtered == np.max(Concentration_filtered[Category_filtered == ca])))[0][0]
             # scale selected spectrum to 0-1 for better visualization with feature importance bars
-            scaled_spectrum = Intensity_filtered[sample_index, :] / np.max(Intensity_filtered[sample_index, :]) if np.max(Intensity_filtered[sample_index, :]) > 0 else Intensity_filtered[sample_index, :]
+            scaled_spectrum = Intensity_filtered[sample_index, :] / np.max(Intensity_filtered[sample_index, :]) \
+                if np.max(Intensity_filtered[sample_index, :]) > 0 else Intensity_filtered[sample_index, :]
+            scaled_spectrum = scaled_spectrum + idx  # Shift each spectrum up by its index for better visibility
             ax.plot(Raman_Shift, scaled_spectrum, color=line_colors[idx % len(line_colors)], linewidth=1.8, label=f'normalized spectrum of {ca}', zorder=3)
 
         ax.set_xlabel('Raman Shift (cm⁻¹)')
