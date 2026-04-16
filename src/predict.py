@@ -175,14 +175,18 @@ def Ratio_prediction_test(data_dir, model_dir):
         
         if len(present_CAs) == 0:
             ratio_pred.append([0, 0, 0])
+            print(f"Real ratio:{ratio_real[i]}, Predicted ratio:[0, 0, 0]")
 
         elif len(present_CAs) == 1:
             if present_CAs[0] == 'DA':
                 ratio_pred.append([1, 0, 0])
+                print(f"Real ratio:{ratio_real[i]}, Predicted ratio:[1, 0, 0]")
             elif present_CAs[0] == 'E':
                 ratio_pred.append([0, 1, 0])
+                print(f"Real ratio:{ratio_real[i]}, Predicted ratio:[0, 1, 0]")
             elif present_CAs[0] == 'NE':
                 ratio_pred.append([0, 0, 1])
+                print(f"Real ratio:{ratio_real[i]}, Predicted ratio:[0, 0, 1]")
 
         else:
             Single_Intensity = Intensity_norm[i].reshape(1, -1)
@@ -195,11 +199,13 @@ def Ratio_prediction_test(data_dir, model_dir):
                 DA_ratio = prob[DA_index]
             else:
                 DA_ratio = 0
+
             if 'E' in present_CAs:
                 E_index = present_CAs.index('E')
                 E_ratio = prob[E_index]
             else:
                 E_ratio = 0
+
             if 'NE' in present_CAs:
                 NE_index = present_CAs.index('NE')
                 NE_ratio = prob[NE_index]
@@ -235,7 +241,8 @@ def Ratio_prediction_test(data_dir, model_dir):
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=list(label_map.values()))
     disp.plot(cmap=plt.cm.Blues, xticks_rotation='vertical')
     plt.title('Confusion Matrix for Molecule Identification')
-    plt.savefig('visualization/Ratio_predction_test-Identification_Confusion_Matrix.png')
+    plt.tight_layout()
+    plt.savefig('visualization/Ratio_predction_test-Identification_Confusion_Matrix.png', dpi = 600)
     plt.show(block = False)
     plt.pause(5)
     plt.close()
@@ -254,7 +261,7 @@ def Ratio_prediction_test(data_dir, model_dir):
     ax.set_zlabel('NE Ratio')
     ax.set_title('Predicted vs Real Concentration Ratios')
     ax.legend()
-    plt.savefig('visualization/Ratio_predction_test-Predicted_vs_Real_Ratios.png')
+    plt.savefig('visualization/Ratio_predction_test-Predicted_vs_Real_Ratios.png', dpi = 600)
     plt.show(block = False)
     plt.pause(5)
     plt.close()
