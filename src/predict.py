@@ -39,13 +39,20 @@ def test_Identification_Model(data_dir, model_dir):
     NE_Labels = (Concentrations[:, 2] > 0).astype(int)  # 1 if NE present, else 0
     NE_Predictions, NE_Probabilities = RF_Identification_Predict(Intensity_norm, 'NE', model_dir, plot=True, labels=NE_Labels)
     print("Identification models tested successfully.")
-    # plot probability distributions for each molecule in one plot
+
+    # RF_Identification_Predict returns class-1 probabilities as a 1D array.
+    DA_probs = np.asarray(DA_Probabilities).reshape(-1)
+    E_probs = np.asarray(E_Probabilities).reshape(-1)
+    NE_probs = np.asarray(NE_Probabilities).reshape(-1)
+
+    # plot probability distributions (boxplot and stripplot)for each molecule in one plot
     # plt.figure(figsize=(10, 6))
-    # plt.hist(DA_Probabilities, bins=20, alpha=0.5, label='DA Probability', color='blue')
-    # plt.hist(E_Probabilities, bins=20, alpha=0.5, label='E Probability', color='orange')
-    # plt.hist(NE_Probabilities, bins=20, alpha=0.5, label='NE Probability', color='green')
-    # plt.xlabel('Predicted Probability')
-    # plt.ylabel('Frequency')
+    # plt.boxplot([DA_probs, E_probs, NE_probs], labels=['DA', 'E', 'NE'])
+    # plt.scatter(np.random.normal(1, 0.04, size=DA_probs.shape[0]), DA_probs, color='blue', alpha=0.6, label='DA')
+    # plt.scatter(np.random.normal(2, 0.04, size=E_probs.shape[0]), E_probs, color='green', alpha=0.6, label='E')
+    # plt.scatter(np.random.normal(3, 0.04, size=NE_probs.shape[0]), NE_probs, color='red', alpha=0.6, label='NE')
+    # plt.xlabel('Molecule')
+    # plt.ylabel('Predicted Probability')
     # plt.title('Predicted Probability Distributions for DA, E, and NE')
     # plt.legend()
     # plt.show()
