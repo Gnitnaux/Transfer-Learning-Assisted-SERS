@@ -151,8 +151,6 @@ def Ratio_prediction_test(data_dir, model_dir):
     NE_Labels = (Concentrations[:, 2] > 0).astype(int)  # 1 if NE present, else 0
     NE_Predictions, NE_Probabilities = RF_Identification_Predict(Intensity_norm, 'NE', model_dir, plot=True, labels=NE_Labels)
 
-    print(f"NE: Real labels: {NE_Labels}")
-    print(f"NE: Predicted labels: {NE_Predictions}")
 
     # Step 2 - Predict concentration ratios using Ratio Models
     last_con = []
@@ -164,13 +162,13 @@ def Ratio_prediction_test(data_dir, model_dir):
 
         present_CAs = []
         label = 0x000
-        if concentration[0] > 0:
+        if DA_Predictions[i] > 0:
             present_CAs.append('DA')
             label += 0x100
-        if concentration[1] > 0:
+        if E_Predictions[i] > 0:
             present_CAs.append('E')
             label += 0x010
-        if concentration[2] > 0:
+        if NE_Predictions[i] > 0:
             present_CAs.append('NE')
             label += 0x001
         label_pred.append(label_map[label])
@@ -187,7 +185,7 @@ def Ratio_prediction_test(data_dir, model_dir):
                 ratio_pred.append([0, 0, 1])
 
         else:
-            Single_Intensity = Intensity_norm[Concentrations.tolist().index(concentration.tolist())].reshape(1, -1)
+            Single_Intensity = Intensity_norm[i].reshape(1, -1)
             Ratio_Predictions, Ratio_Probabilities = RF_Ratio_Predict(Single_Intensity, present_CAs, model_dir, plot=False)
             # append probability as ratio
             prob = Ratio_Probabilities[0] / np.sum(Ratio_Probabilities[0])
