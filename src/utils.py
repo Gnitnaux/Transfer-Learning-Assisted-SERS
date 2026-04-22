@@ -6,6 +6,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+DA_PROB_THRESHOLD = 0.5
+E_PROB_THRESHOLD = 0.5
+NE_PROB_THRESHOLD = 0.5
+
 def read_spectra_train(directory):
     """
     Read and preprocess SERS spectral data from the specified directory for training.

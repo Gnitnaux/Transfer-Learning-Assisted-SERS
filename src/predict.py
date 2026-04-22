@@ -12,6 +12,59 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
+
+def plot_probability_distributions_by_label(probabilities, labels, title):
+    """Plot probability distributions split by binary labels for each molecule."""
+    molecules = ['DA', 'E', 'NE']
+    colors = {0: 'tab:blue', 1: 'tab:orange'}
+    offsets = {0: -0.18, 1: 0.18}
+
+    fig, ax = plt.subplots(figsize=(11, 6))
+
+    for idx, molecule in enumerate(molecules, start=1):
+        probs = np.asarray(probabilities[molecule]).reshape(-1)
+        labs = np.asarray(labels[molecule]).reshape(-1)
+
+        for group in (0, 1):
+            group_probs = probs[labs == group]
+            if group_probs.size == 0:
+                continue
+
+            position = idx + offsets[group]
+            ax.boxplot(
+                group_probs,
+                positions=[position],
+                widths=0.28,
+                patch_artist=True,
+                boxprops=dict(facecolor=colors[group], alpha=0.25, color=colors[group]),
+                medianprops=dict(color=colors[group], linewidth=2),
+                whiskerprops=dict(color=colors[group]),
+                capprops=dict(color=colors[group]),
+                flierprops=dict(markeredgecolor=colors[group], markerfacecolor=colors[group], alpha=0.5),
+            )
+
+            jitter = np.random.normal(position, 0.03, size=group_probs.shape[0])
+            ax.scatter(
+                jitter,
+                group_probs,
+                color=colors[group],
+                alpha=0.55,
+                s=18,
+                label=f'Label {group}' if idx == 1 else None,
+            )
+
+    ax.set_xticks([1, 2, 3])
+    ax.set_xticklabels(molecules)
+    ax.set_xlabel('Molecule')
+    ax.set_ylabel('Predicted Probability')
+    ax.set_title(title)
+    ax.legend(title='True label')
+    ax.set_ylim(0, 1)
+    fig.tight_layout()
+    plt.savefig('Probability distribution.png', dpi = 600)
+    plt.show()
+    plt.pause(5)
+
 def test_Identification_Model(data_dir, model_dir):
     """
     Test the Random Forest Identification Model using SERS data for prediction.
@@ -45,17 +98,11 @@ def test_Identification_Model(data_dir, model_dir):
     E_probs = np.asarray(E_Probabilities).reshape(-1)
     NE_probs = np.asarray(NE_Probabilities).reshape(-1)
 
-    # plot probability distributions (boxplot and stripplot)for each molecule in one plot
-    # plt.figure(figsize=(10, 6))
-    # plt.boxplot([DA_probs, E_probs, NE_probs], labels=['DA', 'E', 'NE'])
-    # plt.scatter(np.random.normal(1, 0.04, size=DA_probs.shape[0]), DA_probs, color='blue', alpha=0.6, label='DA')
-    # plt.scatter(np.random.normal(2, 0.04, size=E_probs.shape[0]), E_probs, color='green', alpha=0.6, label='E')
-    # plt.scatter(np.random.normal(3, 0.04, size=NE_probs.shape[0]), NE_probs, color='red', alpha=0.6, label='NE')
-    # plt.xlabel('Molecule')
-    # plt.ylabel('Predicted Probability')
-    # plt.title('Predicted Probability Distributions for DA, E, and NE')
-    # plt.legend()
-    # plt.show()
+    plot_probability_distributions_by_label(
+        probabilities={'DA': DA_probs, 'E': E_probs, 'NE': NE_probs},
+        labels={'DA': DA_Labels, 'E': E_Labels, 'NE': NE_Labels},
+        title='Predicted Probability Distributions for DA, E, and NE by True Label',
+    )
 
 
 def test_Ratio_Model(data_dir, model_dir):

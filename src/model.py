@@ -9,8 +9,9 @@ from sklearn.metrics import accuracy_score, f1_score
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 import joblib
+from src.utils import DA_PROB_THRESHOLD, E_PROB_THRESHOLD, NE_PROB_THRESHOLD
 
-def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA, model_dir, plot = False):
+def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA, model_dir, plot = False, con = 10):
     """
     Train Random Forest model to identify pure CA from blank SERS spectra.
     Args:
@@ -21,6 +22,7 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
         CA (str): Target Molecule.
         model_dir (str): Directory to save the trained model.
         plot (bool): Whether to plot feature importances.
+        con (float): Selected concentration for training.
     Returns:
         dict: A dictionary with keys: model, feature_indices, avg_accuracy, avg_f1,
               and avg_feature_importances.
@@ -28,6 +30,13 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
     
     # filter data for category == CA or 'BA'
     Labels = (Category == CA).astype(int)  # 1 for CA, 0 for others
+
+    # filter data for selected concentration
+    con_indices = np.isin(Concentration, [con])
+    Intensity = Intensity[con_indices]
+    Category = Category[con_indices]
+    Concentration = Concentration[con_indices]
+    Labels = Labels[con_indices]
 
     n_features = Intensity.shape[1]
     n_iterations = 100
@@ -144,8 +153,17 @@ def RF_Identification_Predict(Intensity, CA, model_dir, plot = False, labels = N
     feature_indices = payload['feature_indices']
 
     X_selected = Intensity[:, feature_indices]
-    predictions = model.predict(X_selected)
+
+    if CA == 'DA':
+        probability_threshold = DA_PROB_THRESHOLD
+    elif CA == 'E':
+        probability_threshold = E_PROB_THRESHOLD
+    elif CA == 'NE':
+        probability_threshold = NE_PROB_THRESHOLD
+
+    # Apply threshold to probabilities to get binary predictions
     probabilities = model.predict_proba(X_selected)[:, 1]  # Probability of class 1 (CA)
+    predictions = (probabilities >= probability_threshold).astype(int)
 
     if plot and labels is not None:
         # Force binary class order so display labels always match matrix dimensions.
