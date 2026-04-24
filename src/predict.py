@@ -61,7 +61,7 @@ def plot_probability_distributions_by_label(probabilities, labels, title):
     ax.legend(title='True label')
     ax.set_ylim(0, 1)
     fig.tight_layout()
-    plt.savefig('Probability distribution.png', dpi = 600)
+    plt.savefig('visualization/Probability distribution.png', dpi = 600)
     plt.show()
     plt.pause(5)
 

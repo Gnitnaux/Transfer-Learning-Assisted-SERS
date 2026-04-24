@@ -27,9 +27,9 @@ def train_model(data_dir, model_dir):
     print("Data normalization completed.")
 
     # Build Identification Model (Model 1)
-    DA_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, Concentration, 'DA', model_dir, plot=True, con = 10)
-    E_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, Concentration, 'E', model_dir, plot=True, con = 10)
-    NE_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, Concentration, 'NE', model_dir, plot=True, con = 10)
+    DA_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, Concentration, 'DA', model_dir, plot=True)
+    E_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, Concentration, 'E', model_dir, plot=True)
+    NE_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, Concentration, 'NE', model_dir, plot=True)
     print("Identification models trained successfully.")
 
     # Build Ratio Model (Model 2)

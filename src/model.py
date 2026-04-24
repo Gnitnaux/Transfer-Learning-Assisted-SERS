@@ -10,8 +10,9 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 import joblib
 from src.utils import DA_PROB_THRESHOLD, E_PROB_THRESHOLD, NE_PROB_THRESHOLD
+from src.utils import digital_mix_ID
 
-def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA, model_dir, plot = False, con = 10):
+def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA, model_dir, plot = False):
     """
     Train Random Forest model to identify pure CA from blank SERS spectra.
     Args:
@@ -28,17 +29,13 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
               and avg_feature_importances.
     """    
     
-    # filter data for category == CA or 'BA'
-    Labels = (Category == CA).astype(int)  # 1 for CA, 0 for others
+    # digital mix data for training
+    Index_con = np.where((Concentration == 10) | (Concentration == 0))[0]
+    Intensity_con = Intensity[Index_con]
+    Category_con = Category[Index_con]
+    Intensity_mix, Label_mix = digital_mix_ID(Raman_Shift, Intensity_con, Category_con, CA, 10, 1000, [0.5, 10])
 
-    # filter data for selected concentration
-    con_indices = np.isin(Concentration, [con])
-    Intensity = Intensity[con_indices]
-    Category = Category[con_indices]
-    Concentration = Concentration[con_indices]
-    Labels = Labels[con_indices]
-
-    n_features = Intensity.shape[1]
+    n_features = Intensity_mix.shape[1]
     n_iterations = 100
     test_size = 0.25
 
@@ -48,11 +45,11 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
 
     for i in range(n_iterations):
         X_train, X_test, y_train, y_test = train_test_split(
-            Intensity,
-            Labels,
+            Intensity_mix,
+            Label_mix,
             test_size=test_size,
             random_state=42 + i,
-            stratify=Labels
+            stratify=Label_mix
         )
 
         rf_model = RandomForestClassifier(
@@ -77,10 +74,10 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
     avg_f1 = float(np.mean(f1_scores))
     avg_feature_importances = np.mean(np.vstack(feature_importances), axis=0)
 
-    top_k = min(50, n_features)
+    top_k = min(100, n_features)
     top_feature_indices = np.argsort(avg_feature_importances)[::-1][:top_k]
 
-    X_selected = Intensity[:, top_feature_indices]
+    X_selected = Intensity_mix[:, top_feature_indices]
 
     final_model = RandomForestClassifier(
         n_estimators=1000,
@@ -90,7 +87,7 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
         random_state=42,
         n_jobs=-1
     )
-    final_model.fit(X_selected, Labels)
+    final_model.fit(X_selected, Label_mix)
 
     os.makedirs(model_dir, exist_ok=True)
     model_path = os.path.join(model_dir, f"rf_identification_{CA}.joblib")

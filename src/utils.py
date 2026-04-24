@@ -182,3 +182,90 @@ def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_ran
         plt.close()
         
     return normalized_Intensity
+
+
+def digital_mix_ID(Raman_Shift, Intensity, Category, CA, data_concentration, num_mix = 1000, Range = [0.5, 10]):
+    """
+    Create digital mixed spectra for identification model training.
+    
+    Args:
+        Raman_Shift (np.ndarray): Array of Raman shift values.
+        Intensity (np.ndarray): 2D array of intensity values (samples x features).
+        Category (np.ndarray): Array of category labels for each sample.
+        CA (str): The target chemical agent for identification.
+        data_concentration (float): The concentration value for the target chemical agent.
+        num_mix (int): The number of mixed spectra to generate.
+        Range (list): The range of concentrations for the mixture components.
+    Returns:
+        Intensity_mix (np.ndarray): 2D array of digitally mixed intensity values.
+        Label_mix (0/1): Array of binary labels indicating presence (1) or absence (0) of the target CA.
+    """
+
+    Index_DA = np.where(Category == 'DA')[0]
+    Index_E = np.where(Category == 'E')[0]
+    Index_NE = np.where(Category == 'NE')[0]
+    Index_BA = np.where(Category == 'BA')[0]
+
+    Intensity_DA = Intensity[Index_DA]
+    Intensity_E = Intensity[Index_E]
+    Intensity_NE = Intensity[Index_NE]
+    Intensity_BA = Intensity[Index_BA]
+
+    # Generate random concentration of mixture
+    np.random.seed(42)  # For reproducibility
+    mix_concentration = np.random.uniform(Range[0], Range[1], num_mix)
+    ratio_CA = mix_concentration / data_concentration
+
+    ratio_CAs = []
+    Label_mix = []
+    # Generate radom ratio containing CA
+    for i in range(num_mix//2):
+        ratio_target = (np.random.uniform(0.05, 1, 1)[0]) * ratio_CA[i]  # Ratio of CA in the mixture
+        ratio_other_1 = (np.random.uniform(0, 1 - ratio_target, 1)[0]) * ratio_CA[i]  # Ratio of other component 1
+        ratio_other_2 = (1 - ratio_target - ratio_other_1) * ratio_CA[i]  # Ratio of other component
+        if CA == 'DA':
+            ratio_CAs.append([ratio_target, ratio_other_1, ratio_other_2, 1- ratio_CA[i]])
+        elif CA == 'E':
+            ratio_CAs.append([ratio_other_1, ratio_target, ratio_other_2, 1- ratio_CA[i]])
+        elif CA == 'NE':
+            ratio_CAs.append([ratio_other_1, ratio_other_2, ratio_target, 1- ratio_CA[i]])
+        Label_mix.append(1)  # Label 1 for spectra containing CA
+
+    for i in range(num_mix - num_mix//2):
+        ratio_other_1 = (np.random.uniform(0, 1, 1)[0]) * ratio_CA[i]  # Ratio of other component 1
+        ratio_other_2 = (np.random.uniform(0, 1 - ratio_other_1, 1)[0]) * ratio_CA[i]  # Ratio of other component 2
+        if CA == 'DA':
+            ratio_CAs.append([0, ratio_other_1, ratio_other_2, 1- ratio_CA[i]])
+        elif CA == 'E':
+            ratio_CAs.append([ratio_other_1, 0, ratio_other_2, 1- ratio_CA[i]])
+        elif CA == 'NE':
+            ratio_CAs.append([ratio_other_1, ratio_other_2, 0, 1- ratio_CA[i]])
+        Label_mix.append(0)  # Label 0 for spectra not containing CA
+
+    # print(ratio_CAs[:10])
+
+    # Linear combination of spectra based on concentration and ratio
+    Intensity_mix = []
+    for i in range(num_mix):
+        selected_DA = Intensity_DA[np.random.choice(Intensity_DA.shape[0])]
+        selected_E = Intensity_E[np.random.choice(Intensity_E.shape[0])]
+        selected_NE = Intensity_NE[np.random.choice(Intensity_NE.shape[0])]
+        selected_BA = Intensity_BA[np.random.choice(Intensity_BA.shape[0])]
+
+        mixed_spectrum = (ratio_CAs[i][0] * selected_DA + ratio_CAs[i][1] * selected_E +
+                          ratio_CAs[i][2] * selected_NE + ratio_CAs[i][3] * selected_BA)
+        Intensity_mix.append(mixed_spectrum)
+
+    Intensity_mix = np.array(Intensity_mix)
+    Label_mix = np.array(Label_mix)
+
+    # plt.figure(figsize=(10, 6))
+    # for i in range(10):  # Plot the first 10 mixed spectra
+    #     plt.plot(Raman_Shift, Intensity_mix[i, :], label=f'Mixed Spectrum {i+1} (Label: {Label_mix[i]})')
+    # plt.xlabel('Raman Shift (cm⁻¹)')
+    # plt.ylabel('Intensity')
+    # plt.title(f'Digitally Mixed SERS Spectra for {CA} Identification')
+    # plt.legend()
+    # plt.show()
+
+    return Intensity_mix, Label_mix
