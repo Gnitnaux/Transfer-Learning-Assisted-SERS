@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import joblib
 from src.utils import DA_PROB_THRESHOLD, E_PROB_THRESHOLD, NE_PROB_THRESHOLD
 
-def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA, model_dir, plot = False, con = 10):
+def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA, model_dir, plot = False, con = [10]):
     """
     Train Random Forest model to identify pure CA from blank SERS spectra.
     Args:
@@ -22,17 +22,21 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
         CA (str): Target Molecule.
         model_dir (str): Directory to save the trained model.
         plot (bool): Whether to plot feature importances.
-        con (float): Selected concentration for training.
+        con (list): List of selected concentrations for training.
     Returns:
         dict: A dictionary with keys: model, feature_indices, avg_accuracy, avg_f1,
               and avg_feature_importances.
     """    
     
     # filter data for category == CA or 'BA'
+    # filter_indices = (Category == CA) | (Category == 'BA')
+    # Intensity = Intensity[filter_indices]
+    # Category = Category[filter_indices]
+    # Concentration = Concentration[filter_indices]
     Labels = (Category == CA).astype(int)  # 1 for CA, 0 for others
 
     # filter data for selected concentration
-    con_indices = np.isin(Concentration, [con])
+    con_indices = np.isin(Concentration, con + [0])
     Intensity = Intensity[con_indices]
     Category = Category[con_indices]
     Concentration = Concentration[con_indices]
@@ -76,9 +80,23 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
     avg_accuracy = float(np.mean(accuracies))
     avg_f1 = float(np.mean(f1_scores))
     avg_feature_importances = np.mean(np.vstack(feature_importances), axis=0)
+    FI_frequency = np.sum(np.vstack(feature_importances) > 0, axis=0)
+    # plt.figure(figsize=(10, 4))
+    # norm_frequency = FI_frequency / n_iterations
+    # norm_fi = avg_feature_importances / np.max(avg_feature_importances) if np.max(avg_feature_importances) > 0 else avg_feature_importances
+    # plt.bar(Raman_Shift, norm_frequency, width=5, color='skyblue')
+    # plt.bar(Raman_Shift, norm_fi, width=5, color='red', alpha=0.6, label='Average Feature Importance', zorder=2)
+    # plt.xlabel('Raman Shift (cm⁻¹)')
+    # plt.ylabel('Feature Importance Frequency')
+    # plt.title(f'Feature Importance Frequency across {n_iterations} Iterations for {CA} Identification')
+    # plt.show()
+
+    # # number of frequency > 0.5
+    # sum_over_half = np.sum(norm_frequency > 0.5)
+    # print(f"Number of features with importance frequency > 0.5: {sum_over_half} out of {n_features}")
 
     top_k = min(50, n_features)
-    top_feature_indices = np.argsort(avg_feature_importances)[::-1][:top_k]
+    top_feature_indices = np.argsort(FI_frequency)[::-1][:top_k]
 
     X_selected = Intensity[:, top_feature_indices]
 
@@ -109,12 +127,12 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
         # scale feature importance to 0-1
         max_importance = np.max(avg_feature_importances)
         scaled_importances = avg_feature_importances / max_importance if max_importance > 0 else avg_feature_importances
-        bar_heights = np.ones(len(top_feature_indices)) * 3
-        bar_colors = plt.cm.YlOrRd(0.2 + 0.45 * scaled_importances[top_feature_indices])
+        bar_heights = np.ones(len(top_feature_indices)) * 4
+        bar_colors = plt.cm.YlOrRd(0.2 + 0.4 * scaled_importances[top_feature_indices])
         ax.bar(Raman_Shift[top_feature_indices], bar_heights, width=5, color=bar_colors, label='Top Features', zorder=2)
 
-        line_colors = ['#0B1F3A', '#1B4332', '#4A148C']
-        for idx, ca in enumerate(['DA', 'E', 'NE']):
+        line_colors = ['#0B1F3A', '#1B4332', '#4A148C', "#020364"]
+        for idx, ca in enumerate(['BA', 'DA', 'E', 'NE']):
             sample_index = np.where((Category == ca) & (Concentration == np.max(Concentration[Category == ca])))[0][0]
             # scale selected spectrum to 0-1 for better visualization with feature importance bars
             scaled_spectrum = Intensity[sample_index, :] / np.max(Intensity[sample_index, :]) \
