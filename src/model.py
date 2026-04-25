@@ -33,7 +33,7 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
     Index_con = np.where((Concentration == 10) | (Concentration == 0))[0]
     Intensity_con = Intensity[Index_con]
     Category_con = Category[Index_con]
-    Intensity_mix, Label_mix = digital_mix_ID(Raman_Shift, Intensity_con, Category_con, CA, 10, 1000, [0.5, 10])
+    Intensity_mix, Label_mix = digital_mix_ID(Raman_Shift, Intensity_con, Category_con, CA, 10, 2000, [0.5, 10])
 
     n_features = Intensity_mix.shape[1]
     n_iterations = 100
@@ -74,7 +74,7 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
     avg_f1 = float(np.mean(f1_scores))
     avg_feature_importances = np.mean(np.vstack(feature_importances), axis=0)
 
-    top_k = min(100, n_features)
+    top_k = min(50, n_features)
     top_feature_indices = np.argsort(avg_feature_importances)[::-1][:top_k]
 
     X_selected = Intensity_mix[:, top_feature_indices]

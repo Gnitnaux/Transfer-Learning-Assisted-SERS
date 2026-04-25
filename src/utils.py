@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 DA_PROB_THRESHOLD = 0.5
 E_PROB_THRESHOLD = 0.5
@@ -54,7 +55,7 @@ def read_spectra_train(directory):
 
     return Raman_Shift, Intensity, Category, Concentration
 
-def read_spectra_predict(directory):
+def read_spectra_test(directory):
     """
     Read and preprocess SERS spectral data from the specified directory for prediction.
     Args:
@@ -117,7 +118,7 @@ def read_spectra_unknown(directory):
                 file_path = os.path.join(folder_path, file)
                 if file.endswith('.csv'):
                     data = pd.read_csv(file_path, sep=',', skiprows=[0], names=['Raman Shift', 'Intensity'], encoding='GBK')
-                    data_cut = data[(data['Raman Shift'] >= 400) & (data['Raman Shift'] <= 2000)]
+                    data_cut = data[(data['Raman Shift'] >= 330) & (data['Raman Shift'] <= 1600)]
                     spectra_data.append(data_cut)
             data_dict[folder] = spectra_data
 
@@ -220,7 +221,7 @@ def digital_mix_ID(Raman_Shift, Intensity, Category, CA, data_concentration, num
     Label_mix = []
     # Generate radom ratio containing CA
     for i in range(num_mix//2):
-        ratio_target = (np.random.uniform(0.05, 1, 1)[0]) * ratio_CA[i]  # Ratio of CA in the mixture
+        ratio_target = (np.random.uniform(0.3, 1, 1)[0]) * ratio_CA[i]  # Ratio of CA in the mixture
         ratio_other_1 = (np.random.uniform(0, 1 - ratio_target, 1)[0]) * ratio_CA[i]  # Ratio of other component 1
         ratio_other_2 = (1 - ratio_target - ratio_other_1) * ratio_CA[i]  # Ratio of other component
         if CA == 'DA':
@@ -269,3 +270,79 @@ def digital_mix_ID(Raman_Shift, Intensity, Category, CA, data_concentration, num
     # plt.show()
 
     return Intensity_mix, Label_mix
+
+
+def plot_probability_distributions_by_label(probabilities, labels, title, folders):
+    """Plot probability distributions split by binary labels for each molecule."""
+    molecules = ['DA', 'E', 'NE']
+    colors = {0: 'tab:blue', 1: 'tab:orange'}
+    offsets = {0: -0.18, 1: 0.18}
+
+    fig, ax = plt.subplots(figsize=(11, 6))
+
+    for idx, molecule in enumerate(molecules, start=1):
+        probs = np.asarray(probabilities[molecule]).reshape(-1)
+        labs = np.asarray(labels[molecule]).reshape(-1)
+
+        for group in (0, 1):
+            group_probs = probs[labs == group]
+            if group_probs.size == 0:
+                continue
+
+            position = idx + offsets[group]
+            ax.boxplot(
+                group_probs,
+                positions=[position],
+                widths=0.28,
+                patch_artist=True,
+                boxprops=dict(facecolor=colors[group], alpha=0.25, color=colors[group]),
+                medianprops=dict(color=colors[group], linewidth=2),
+                whiskerprops=dict(color=colors[group]),
+                capprops=dict(color=colors[group]),
+                flierprops=dict(markeredgecolor=colors[group], markerfacecolor=colors[group], alpha=0.5),
+            )
+
+            jitter = np.random.normal(position, 0.03, size=group_probs.shape[0])
+            ax.scatter(
+                jitter,
+                group_probs,
+                color=colors[group],
+                alpha=0.55,
+                s=18,
+                label=f'Label {group}' if idx == 1 else None,
+            )
+
+    ax.set_xticks([1, 2, 3])
+    ax.set_xticklabels(molecules)
+    ax.set_xlabel('Molecule')
+    ax.set_ylabel('Predicted Probability')
+    ax.set_title(title)
+    ax.legend(title='True label')
+    ax.set_ylim(0, 1)
+    fig.tight_layout()
+    plt.savefig('visualization/Probability distribution.png', dpi = 600)
+    plt.show(block = False)
+    plt.pause(5)
+    plt.close()
+
+    # plot probability distributions for each folder, 3 subplots for DA, E, NE
+    plt.figure(figsize=(12, 20))
+
+    for idx, molecule in enumerate(molecules, start=1):
+        plt.subplot(3, 1, idx)
+        # plot box plot, hue by folder
+        df = pd.DataFrame({
+            'Probability': probabilities[molecule].reshape(-1),
+            'Label': labels[molecule].reshape(-1),
+            'folder': folders
+        })
+        sns.boxplot(x='folder', y='Probability', data=df)
+        sns.stripplot(x='folder', y='Probability', data=df, alpha=0.5, jitter=True)
+        plt.title(f'Probability distribution for {molecule}')
+        plt.ylim(0, 1)
+        plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('visualization/Probability distribution by folder.png', dpi = 600)
+    plt.show(block = False)
+    plt.pause(5)
+    plt.close()
