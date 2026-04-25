@@ -10,6 +10,7 @@ import seaborn as sns
 DA_PROB_THRESHOLD = 0.5
 E_PROB_THRESHOLD = 0.5
 NE_PROB_THRESHOLD = 0.5
+ID_MOLECULES = ['DA', 'E', 'NE']
 
 def read_spectra_train(directory):
     """
@@ -270,6 +271,101 @@ def digital_mix_ID(Raman_Shift, Intensity, Category, CA, data_concentration, num
     # plt.show()
 
     return Intensity_mix, Label_mix
+
+
+def digital_mix_ID_multilabel(
+    Raman_Shift,
+    Intensity,
+    Category,
+    data_concentration=10.0,
+    samples_per_combination=400,
+    Range=(0.5, 10.0),
+    seed=42,
+):
+    """
+    Create digitally mixed spectra for a shared multi-label identification model.
+
+    The synthetic mixtures are built from 10 uM single-component spectra (DA/E/NE)
+    and background spectra (BA). Eight balanced mixture patterns are generated:
+    BA, DA, E, NE, DA+E, DA+NE, E+NE, DA+E+NE.
+
+    Args:
+        Raman_Shift (np.ndarray): Array of Raman shift values.
+        Intensity (np.ndarray): 2D array of intensity values (samples x features).
+        Category (np.ndarray): Array of category labels for each sample.
+        data_concentration (float): Concentration represented by the single-component spectra.
+        samples_per_combination (int): Number of synthetic spectra for each composition pattern.
+        Range (tuple): Total analyte concentration range in uM for non-background mixtures.
+        seed (int): Random seed for reproducibility.
+
+    Returns:
+        tuple:
+            Intensity_mix (np.ndarray): Synthetic mixed spectra.
+            Label_mix (np.ndarray): Binary presence labels with shape (N, 3) for DA/E/NE.
+            Abundance_mix (np.ndarray): Mixing ratios with shape (N, 4) for DA/E/NE/BA.
+            Combination_labels (np.ndarray): Integer labels in [0, 7].
+    """
+    _ = Raman_Shift  # kept for interface symmetry with the original helper
+
+    rng = np.random.default_rng(seed)
+    category = np.asarray(Category)
+
+    spectra_by_category = {}
+    for molecule in ['DA', 'E', 'NE', 'BA']:
+        indices = np.where(category == molecule)[0]
+        if indices.size == 0:
+            raise ValueError(f"Category '{molecule}' is required for digital mixing.")
+        spectra_by_category[molecule] = np.asarray(Intensity[indices], dtype=np.float32)
+
+    combinations = [
+        (0, 0, 0),
+        (1, 0, 0),
+        (0, 1, 0),
+        (0, 0, 1),
+        (1, 1, 0),
+        (1, 0, 1),
+        (0, 1, 1),
+        (1, 1, 1),
+    ]
+
+    mixed_spectra = []
+    binary_labels = []
+    abundance_labels = []
+    combination_labels = []
+
+    for combination_id, combination in enumerate(combinations):
+        active_indices = [idx for idx, present in enumerate(combination) if present]
+        for _sample_idx in range(samples_per_combination):
+            if active_indices:
+                total_concentration = rng.uniform(Range[0], Range[1])
+                total_ratio = total_concentration / float(data_concentration)
+                component_split = rng.dirichlet(np.ones(len(active_indices)))
+            else:
+                total_ratio = 0.0
+                component_split = np.array([], dtype=np.float32)
+
+            abundance = np.zeros(4, dtype=np.float32)
+            for split_value, active_idx in zip(component_split, active_indices):
+                abundance[active_idx] = total_ratio * float(split_value)
+            abundance[3] = max(0.0, 1.0 - float(np.sum(abundance[:3])))
+
+            spectrum = np.zeros(Intensity.shape[1], dtype=np.float32)
+            spectrum += abundance[3] * spectra_by_category['BA'][rng.integers(len(spectra_by_category['BA']))]
+            spectrum += abundance[0] * spectra_by_category['DA'][rng.integers(len(spectra_by_category['DA']))]
+            spectrum += abundance[1] * spectra_by_category['E'][rng.integers(len(spectra_by_category['E']))]
+            spectrum += abundance[2] * spectra_by_category['NE'][rng.integers(len(spectra_by_category['NE']))]
+
+            mixed_spectra.append(spectrum)
+            binary_labels.append(np.asarray(combination, dtype=np.float32))
+            abundance_labels.append(abundance)
+            combination_labels.append(combination_id)
+
+    return (
+        np.asarray(mixed_spectra, dtype=np.float32),
+        np.asarray(binary_labels, dtype=np.float32),
+        np.asarray(abundance_labels, dtype=np.float32),
+        np.asarray(combination_labels, dtype=np.int64),
+    )
 
 
 def plot_probability_distributions_by_label(probabilities, labels, title, folders):

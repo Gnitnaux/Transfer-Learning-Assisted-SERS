@@ -6,6 +6,7 @@ from src.utils import read_spectra_train
 from src.utils import spectra_normalization
 from src.model import RF_Identification_Train
 from src.model import RF_Ratio_Train
+from src.ae_id_model import AE_Identification_Train
 
 def train_model(data_dir, model_dir):
     """
@@ -27,10 +28,15 @@ def train_model(data_dir, model_dir):
     print("Data normalization completed.")
 
     # Build Identification Model (Model 1)
-    DA_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, Concentration, 'DA', model_dir, plot=True)
-    E_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, Concentration, 'E', model_dir, plot=True)
-    NE_IdModel = RF_Identification_Train(Raman_Shift, Intensity_norm, Category, Concentration, 'NE', model_dir, plot=True)
-    print("Identification models trained successfully.")
+    AE_IdModel = AE_Identification_Train(
+        Raman_Shift,
+        Intensity_norm,
+        Category,
+        Concentration,
+        model_dir,
+        plot=True,
+    )
+    print("AE identification model trained successfully.")
 
     # Build Ratio Model (Model 2)
     CAs = ['DA', 'E']
