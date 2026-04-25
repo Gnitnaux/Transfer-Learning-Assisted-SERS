@@ -368,6 +368,47 @@ def digital_mix_ID_multilabel(
     )
 
 
+def digital_mix_unmixing(
+    Raman_Shift,
+    Intensity,
+    Category,
+    data_concentration=10.0,
+    samples_per_combination=400,
+    Range=(0.5, 10.0),
+    seed=42,
+):
+    """
+    Create digitally mixed spectra for direct autoencoder unmixing.
+
+    Args:
+        Raman_Shift (np.ndarray): Array of Raman shift values.
+        Intensity (np.ndarray): 2D array of intensity values (samples x features).
+        Category (np.ndarray): Array of category labels for each sample.
+        data_concentration (float): Concentration represented by the single-component spectra.
+        samples_per_combination (int): Number of synthetic spectra for each composition pattern.
+        Range (tuple): Total analyte concentration range in uM for non-background mixtures.
+        seed (int): Random seed for reproducibility.
+
+    Returns:
+        tuple:
+            Intensity_mix (np.ndarray): Synthetic mixed spectra.
+            Abundance_mix (np.ndarray): Mixing ratios with shape (N, 4) for DA/E/NE/BA.
+            Analyte_concentration_mix (np.ndarray): Absolute concentrations with shape (N, 3) for DA/E/NE in uM.
+            Combination_labels (np.ndarray): Integer labels in [0, 7].
+    """
+    Intensity_mix, _binary_labels, Abundance_mix, Combination_labels = digital_mix_ID_multilabel(
+        Raman_Shift,
+        Intensity,
+        Category,
+        data_concentration=data_concentration,
+        samples_per_combination=samples_per_combination,
+        Range=Range,
+        seed=seed,
+    )
+    analyte_concentration_mix = Abundance_mix[:, :3] * float(data_concentration)
+    return Intensity_mix, Abundance_mix, analyte_concentration_mix, Combination_labels
+
+
 def plot_probability_distributions_by_label(probabilities, labels, title, folders):
     """Plot probability distributions split by binary labels for each molecule."""
     molecules = ['DA', 'E', 'NE']

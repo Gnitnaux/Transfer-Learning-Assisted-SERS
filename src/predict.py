@@ -10,6 +10,7 @@ from src.utils import plot_probability_distributions_by_label
 from src.model import RF_Identification_Predict
 from src.model import RF_Ratio_Predict
 from src.ae_id_model import AE_Identification_Predict_Multi
+from src.ae_unmixing_model import AE_Unmixing_Predict
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -170,13 +171,11 @@ def test_Ratio_Model(data_dir, model_dir):
 
 def Ratio_prediction_test(data_dir, model_dir):
     """
-    Predict concentration ratios using the trained Ratio Model.
+    Test the direct AE unmixing model on the real mixed test dataset.
     
     Args:
         data_dir (str): Path to the preprocessed data directory for prediction.
         model_dir (str): Path to the trained model directory.
-    Returns:
-        list: Predicted concentration ratios [DA_ratio, E_ratio, NE_ratio].
     """
     # Load and preprocess prediction data
     Raman_Shift, Intensity, Concentrations = read_spectra_test(data_dir)
@@ -189,152 +188,81 @@ def Ratio_prediction_test(data_dir, model_dir):
                                            peak_position=920, peak_range=20, plot=True, mode = 'testRatio_predict')
     print("Prediction data normalization completed.")
 
-    ratio_pred = []
-    ratio_real = []
-    label_real = []
-    label_pred = []
-
-    # a dictionary for label mapping
-    label_map = {0x000: 'None', 0x100: 'DA', 0x010: 'E', 0x001: 'NE',
-                 0x110: 'DA+E', 0x101: 'DA+NE', 0x011: 'E+NE', 0x111: 'DA+E+NE'}
-
-    for concentration in Concentrations:
-        ratio_real.append(concentration / np.sum(concentration) if np.sum(concentration) > 0 else [0,0,0])
-        label = 0x000
-        if concentration[0] > 0:
-            label += 0x100
-        if concentration[1] > 0:
-            label += 0x010
-        if concentration[2] > 0:
-            label += 0x001
-        label_real.append(label_map[label])
-        
-
-    # Step 1 - Identify present molecules using Identification Models
-    DA_Labels = (Concentrations[:, 0] > 0).astype(int)  # 1 if DA present, else 0
-    E_Labels = (Concentrations[:, 1] > 0).astype(int)  # 1 if E present, else 0
-    NE_Labels = (Concentrations[:, 2] > 0).astype(int)  # 1 if NE present, else 0
-    multi_predictions, multi_probabilities = AE_Identification_Predict_Multi(Intensity_norm, model_dir)
-    DA_Predictions, E_Predictions, NE_Predictions = multi_predictions[:, 0], multi_predictions[:, 1], multi_predictions[:, 2]
-    DA_Probabilities, E_Probabilities, NE_Probabilities = (
-        multi_probabilities[:, 0],
-        multi_probabilities[:, 1],
-        multi_probabilities[:, 2],
+    prediction_payload = AE_Unmixing_Predict(Intensity_norm, model_dir)
+    concentration_pred = prediction_payload["concentrations"]
+    ratio_pred = prediction_payload["ratios"]
+    ratio_real = np.divide(
+        Concentrations,
+        np.sum(Concentrations, axis=1, keepdims=True) + 1e-8,
+        out=np.zeros_like(Concentrations, dtype=float),
+        where=np.sum(Concentrations, axis=1, keepdims=True) > 0,
     )
 
-
-    # Step 2 - Predict concentration ratios using Ratio Models
-    last_con = []
-    for i, concentration in enumerate(Concentrations):
-        if len(last_con) == 0:
-            print(f"Predicting ratios for [DA, E, NE] concentrations: {concentration}")
-        elif not np.array_equal(concentration, last_con):
-            print(f"Predicting ratios for [DA, E, NE] concentrations: {concentration}")
-
-        present_CAs = []
-        label = 0x000
-        if DA_Predictions[i] > 0:
-            present_CAs.append('DA')
-            label += 0x100
-        if E_Predictions[i] > 0:
-            present_CAs.append('E')
-            label += 0x010
-        if NE_Predictions[i] > 0:
-            present_CAs.append('NE')
-            label += 0x001
-        label_pred.append(label_map[label])
-        
-        if len(present_CAs) == 0:
-            ratio_pred.append([0, 0, 0])
-            print(f"Real ratio:{ratio_real[i]}, Predicted ratio:[0, 0, 0]")
-
-        elif len(present_CAs) == 1:
-            if present_CAs[0] == 'DA':
-                ratio_pred.append([1, 0, 0])
-                print(f"Real ratio:{ratio_real[i]}, Predicted ratio:[1, 0, 0]")
-            elif present_CAs[0] == 'E':
-                ratio_pred.append([0, 1, 0])
-                print(f"Real ratio:{ratio_real[i]}, Predicted ratio:[0, 1, 0]")
-            elif present_CAs[0] == 'NE':
-                ratio_pred.append([0, 0, 1])
-                print(f"Real ratio:{ratio_real[i]}, Predicted ratio:[0, 0, 1]")
-
-        else:
-            Single_Intensity = Intensity_norm[i].reshape(1, -1)
-            Ratio_Predictions, Ratio_Probabilities = RF_Ratio_Predict(Single_Intensity, present_CAs, model_dir, plot=False)
-            # append probability as ratio
-            prob = Ratio_Probabilities[0] / np.sum(Ratio_Probabilities[0])
-
-            if 'DA' in present_CAs:
-                DA_index = present_CAs.index('DA')
-                DA_ratio = prob[DA_index]
-            else:
-                DA_ratio = 0
-
-            if 'E' in present_CAs:
-                E_index = present_CAs.index('E')
-                E_ratio = prob[E_index]
-            else:
-                E_ratio = 0
-
-            if 'NE' in present_CAs:
-                NE_index = present_CAs.index('NE')
-                NE_ratio = prob[NE_index]
-            else:
-                NE_ratio = 0
-
-            ratio_pred.append([DA_ratio, E_ratio, NE_ratio])
-            print(f"Real ratio:{ratio_real[i]}, Predicted ratio:[{DA_ratio:.3f}, {E_ratio:.3f}, {NE_ratio:.3f}]")
-
-        last_con = concentration
-
-    # calculate average prediction for each unique concentration in Concentrations
-    print("\nCalculating average predicted ratios for each unique concentration...")
+    # average predictions for each unique concentration setting
     unique_concentrations = np.unique(Concentrations, axis=0)
-    unique_real_ratios = []
+    avg_concentration_pred = []
     avg_ratio_pred = []
+    unique_ratio_real = []
     for unique_con in unique_concentrations:
-        indices = [i for i, con in enumerate(Concentrations) if np.array_equal(con, unique_con)]
-        unique_real_ratios.append(ratio_real[indices[0]])
-        avg_pred = np.mean([ratio_pred[i] for i in indices], axis=0)
-        avg_ratio_pred.append(avg_pred)
-        print(f"Average predicted ratio for concentration {unique_con}: [{avg_pred[0]:.3f}, {avg_pred[1]:.3f}, {avg_pred[2]:.3f}]")
+        indices = np.where(np.all(Concentrations == unique_con, axis=1))[0]
+        avg_concentration_pred.append(np.mean(concentration_pred[indices], axis=0))
+        avg_ratio_pred.append(np.mean(ratio_pred[indices], axis=0))
+        unique_ratio_real.append(ratio_real[indices[0]])
+        print(
+            f"Condition {unique_con}: "
+            f"pred concentration = {np.mean(concentration_pred[indices], axis=0)}, "
+            f"pred ratio = {np.mean(ratio_pred[indices], axis=0)}"
+        )
 
-    # calculate RMSE between avg_ratio_pred and unique_real_ratios
-    print("\nCalculating RMSE between average predicted ratios and real ratios...")
-    unique_real_ratios = np.array(unique_real_ratios)
-    avg_ratio_pred = np.array(avg_ratio_pred)
-    rmse = np.sqrt(np.mean((unique_real_ratios - avg_ratio_pred) ** 2, axis=0))
-    print(f"\nRMSE between average predicted ratios and real ratios: DA: {rmse[0]:.3f}, E: {rmse[1]:.3f}, NE: {rmse[2]:.3f}")
+    avg_concentration_pred = np.asarray(avg_concentration_pred, dtype=float)
+    avg_ratio_pred = np.asarray(avg_ratio_pred, dtype=float)
+    unique_ratio_real = np.asarray(unique_ratio_real, dtype=float)
 
-    # plot confusion matrix for identification results
-    cm = confusion_matrix(label_real, label_pred, labels=list(label_map.values()))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=list(label_map.values()))
-    disp.plot(cmap=plt.cm.Blues, xticks_rotation='vertical')
-    plt.title('Confusion Matrix for Molecule Identification')
-    plt.tight_layout()
-    plt.savefig('visualization/Ratio_predction_test-Identification_Confusion_Matrix.png', dpi = 600)
-    plt.show(block = False)
-    plt.pause(5)
-    plt.close()
-        
-    # plot pred-real pairs in 3D scatter plot, line the pair togther
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(unique_real_ratios[:, 0], unique_real_ratios[:, 1], unique_real_ratios[:, 2], c='b', marker='o', label='Real Ratios')
-    ax.scatter(avg_ratio_pred[:, 0], avg_ratio_pred[:, 1], avg_ratio_pred[:, 2], c='r', marker='^', label='Predicted Ratios')
-    for i in range(len(unique_real_ratios)):
-        ax.plot([unique_real_ratios[i, 0], avg_ratio_pred[i, 0]],
-                [unique_real_ratios[i, 1], avg_ratio_pred[i, 1]],
-                [unique_real_ratios[i, 2], avg_ratio_pred[i, 2]], 'k--', linewidth=0.5)
-    ax.set_xlabel('DA Ratio')
-    ax.set_ylabel('E Ratio')
-    ax.set_zlabel('NE Ratio')
-    ax.set_title('Predicted vs Real Concentration Ratios')
-    ax.legend()
-    plt.savefig('visualization/Ratio_predction_test-Predicted_vs_Real_Ratios.png', dpi = 600)
-    plt.show(block = False)
-    plt.pause(5)
-    plt.close()
+    concentration_rmse = np.sqrt(np.mean((avg_concentration_pred - unique_concentrations) ** 2, axis=0))
+    ratio_rmse = np.sqrt(np.mean((avg_ratio_pred - unique_ratio_real) ** 2, axis=0))
+    print(
+        "Average concentration RMSE: "
+        f"DA={concentration_rmse[0]:.3f}, E={concentration_rmse[1]:.3f}, NE={concentration_rmse[2]:.3f}"
+    )
+    print(
+        "Average ratio RMSE: "
+        f"DA={ratio_rmse[0]:.3f}, E={ratio_rmse[1]:.3f}, NE={ratio_rmse[2]:.3f}"
+    )
 
-    print("Ratio prediction completed.")
+    def _plot_scatter(actual, predicted, labels, title, path):
+        fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+        for idx, molecule in enumerate(labels):
+            ax = axes[idx]
+            ax.scatter(actual[:, idx], predicted[:, idx], s=40, alpha=0.8)
+            lower = float(min(np.min(actual[:, idx]), np.min(predicted[:, idx])))
+            upper = float(max(np.max(actual[:, idx]), np.max(predicted[:, idx])))
+            if np.isclose(lower, upper):
+                upper = lower + 1.0
+            ax.plot([lower, upper], [lower, upper], "k--", linewidth=1.5)
+            ax.set_xlabel(f"Actual {molecule}")
+            ax.set_ylabel(f"Predicted {molecule}")
+            ax.set_title(molecule)
+            ax.grid(True, alpha=0.3)
+        fig.suptitle(title)
+        fig.tight_layout()
+        fig.savefig(path, dpi=600)
+        plt.show(block=False)
+        plt.pause(5)
+        plt.close(fig)
+
+    _plot_scatter(
+        unique_concentrations,
+        avg_concentration_pred,
+        ["DA Concentration", "E Concentration", "NE Concentration"],
+        "AE Unmixing: Predicted vs Actual Concentration",
+        "visualization/AE_Unmixing_Test_Concentration_Scatter.png",
+    )
+    _plot_scatter(
+        unique_ratio_real,
+        avg_ratio_pred,
+        ["DA Ratio", "E Ratio", "NE Ratio"],
+        "AE Unmixing: Predicted vs Actual Ratio",
+        "visualization/AE_Unmixing_Test_Ratio_Scatter.png",
+    )
+
+    print("AE unmixing test completed.")

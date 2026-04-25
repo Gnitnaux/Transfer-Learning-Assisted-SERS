@@ -7,6 +7,7 @@ from src.utils import spectra_normalization
 from src.model import RF_Identification_Train
 from src.model import RF_Ratio_Train
 from src.ae_id_model import AE_Identification_Train
+from src.ae_unmixing_model import AE_Unmixing_Train
 
 def train_model(data_dir, model_dir):
     """
@@ -27,8 +28,8 @@ def train_model(data_dir, model_dir):
                                            peak_position=920, peak_range=20, plot=True, mode = 'train')
     print("Data normalization completed.")
 
-    # Build Identification Model (Model 1)
-    AE_IdModel = AE_Identification_Train(
+    # Build direct AE unmixing model
+    AE_Unmixing_Model = AE_Unmixing_Train(
         Raman_Shift,
         Intensity_norm,
         Category,
@@ -36,22 +37,7 @@ def train_model(data_dir, model_dir):
         model_dir,
         plot=True,
     )
-    print("AE identification model trained successfully.")
-
-    # Build Ratio Model (Model 2)
-    CAs = ['DA', 'E']
-    RatioModel_DA_E = RF_Ratio_Train(Raman_Shift, Intensity_norm, Category, Concentration, CAs, model_dir, plot=True, con = 10)
-
-    CAs = ['DA', 'NE']
-    RatioModel_DA_NE = RF_Ratio_Train(Raman_Shift, Intensity_norm, Category, Concentration, CAs, model_dir, plot=True, con = 10)
-    
-    CAs = ['E', 'NE']
-    RatioModel_E_NE = RF_Ratio_Train(Raman_Shift, Intensity_norm, Category, Concentration, CAs, model_dir, plot=True, con = 10)
-
-    CAs = ['DA', 'E', 'NE']
-    RatioModel_DA_E_NE = RF_Ratio_Train(Raman_Shift, Intensity_norm, Category, Concentration, CAs, model_dir, plot=True, con = 10) 
-
-    print("Ratio model trained successfully.")
+    print("AE direct unmixing model trained successfully.")
 
 
 def test_train_ratio_model(data_dir, model_dir):

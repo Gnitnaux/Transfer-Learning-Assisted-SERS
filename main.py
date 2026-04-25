@@ -27,7 +27,7 @@ def main():
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["train", "predict", "test", "test_IdModel", "test_RatioModel_train", "test_RatioModel_predict"],
+        choices=["train", "predict", "test", "test_unmixing", "test_IdModel", "test_RatioModel_train", "test_RatioModel_predict"],
         default="train",
         help="Operation mode: train or predict"
     )
@@ -67,7 +67,7 @@ def main():
         # TODO: Import and call prediction function from src/
     
     elif args.mode == "test":
-        print("\nTesting mode selected.")
+        print("\nTesting direct AE unmixing mode selected.")
         Ratio_prediction_test(os.path.join(args.data_dir, 'test'), args.model_dir)
 
     elif args.mode == "test_IdModel":
