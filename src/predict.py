@@ -3,8 +3,10 @@ Prediction module for Random Forest Identification Model.
 """
 
 from src.utils import read_spectra_train
-from src.utils import read_spectra_predict
+from src.utils import read_spectra_test
+from src.utils import read_spectra_unknown
 from src.utils import spectra_normalization
+from src.utils import plot_probability_distributions_by_label
 from src.model import RF_Identification_Predict
 from src.model import RF_Ratio_Predict
 import os
@@ -12,59 +14,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
-
-def plot_probability_distributions_by_label(probabilities, labels, title):
-    """Plot probability distributions split by binary labels for each molecule."""
-    molecules = ['DA', 'E', 'NE']
-    colors = {0: 'tab:blue', 1: 'tab:orange'}
-    offsets = {0: -0.18, 1: 0.18}
-
-    fig, ax = plt.subplots(figsize=(11, 6))
-
-    for idx, molecule in enumerate(molecules, start=1):
-        probs = np.asarray(probabilities[molecule]).reshape(-1)
-        labs = np.asarray(labels[molecule]).reshape(-1)
-
-        for group in (0, 1):
-            group_probs = probs[labs == group]
-            if group_probs.size == 0:
-                continue
-
-            position = idx + offsets[group]
-            ax.boxplot(
-                group_probs,
-                positions=[position],
-                widths=0.28,
-                patch_artist=True,
-                boxprops=dict(facecolor=colors[group], alpha=0.25, color=colors[group]),
-                medianprops=dict(color=colors[group], linewidth=2),
-                whiskerprops=dict(color=colors[group]),
-                capprops=dict(color=colors[group]),
-                flierprops=dict(markeredgecolor=colors[group], markerfacecolor=colors[group], alpha=0.5),
-            )
-
-            jitter = np.random.normal(position, 0.03, size=group_probs.shape[0])
-            ax.scatter(
-                jitter,
-                group_probs,
-                color=colors[group],
-                alpha=0.55,
-                s=18,
-                label=f'Label {group}' if idx == 1 else None,
-            )
-
-    ax.set_xticks([1, 2, 3])
-    ax.set_xticklabels(molecules)
-    ax.set_xlabel('Molecule')
-    ax.set_ylabel('Predicted Probability')
-    ax.set_title(title)
-    ax.legend(title='True label')
-    ax.set_ylim(0, 1)
-    fig.tight_layout()
-    plt.savefig('visualization/Probability distribution.png', dpi = 600)
-    plt.show()
-    plt.pause(5)
-    plt.close()                                                        
 
 def test_Identification_Model(data_dir, model_dir):
     """
@@ -75,7 +24,7 @@ def test_Identification_Model(data_dir, model_dir):
         model_dir (str): Path to the trained model directory.
     """
     # Load and preprocess prediction data
-    Raman_Shift, Intensity, Concentrations = read_spectra_predict(data_dir)
+    Raman_Shift, Intensity, Folders = read_spectra_unknown(data_dir)
     print(f"Raman Shift shape: {Raman_Shift.shape}")
     print(f"Intensity shape: {Intensity.shape}")
     print("Prediction data loaded successfully.")
@@ -84,6 +33,16 @@ def test_Identification_Model(data_dir, model_dir):
     Intensity_norm = spectra_normalization(Raman_Shift, Intensity, 
                                            peak_position=920, peak_range=20, plot=True, mode = 'test_IDModel')
     print("Prediction data normalization completed.")
+
+    # extract concentrations from folders, the order of CAs in folder is DA, E, NE
+    Concentration_list = []
+    for folder in Folders:
+            DA_con = (folder.split('_')[0]).split('u')[0]
+            E_con = (folder.split('_')[1]).split('u')[0]
+            NE_con = (folder.split('_')[2]).split('u')[0]
+            Concentration_list.append([float(DA_con), float(E_con), float(NE_con)]) 
+
+    Concentrations = np.array(Concentration_list, dtype=float)
 
     # Load and test Identification Model (Model 1)
     DA_Labels = (Concentrations[:, 0] > 0).astype(int)  # 1 if DA present, else 0
@@ -103,7 +62,47 @@ def test_Identification_Model(data_dir, model_dir):
         probabilities={'DA': DA_probs, 'E': E_probs, 'NE': NE_probs},
         labels={'DA': DA_Labels, 'E': E_Labels, 'NE': NE_Labels},
         title='Predicted Probability Distributions for DA, E, and NE by True Label',
+        folders = Folders
     )
+
+    # use expectation for folder label prediction, if probability > 0.5, predict present, else predict absent
+    folder_predictions = []
+    folder_true_label = []
+    folder_probabilities = []
+    for folder in np.unique(Folders):
+        indices = [i for i, f in enumerate(Folders) if f == folder]
+        DA_prob_mean = np.mean(DA_probs[indices])
+        E_prob_mean = np.mean(E_probs[indices])
+        NE_prob_mean = np.mean(NE_probs[indices])
+
+        DA_pred = 1 if DA_prob_mean > 0.5 else 0
+        E_pred = 1 if E_prob_mean > 0.5 else 0
+        NE_pred = 1 if NE_prob_mean > 0.5 else 0
+
+        folder_predictions.append((folder, DA_pred, E_pred, NE_pred))
+        folder_true_label.append((folder, DA_Labels[indices[0]], E_Labels[indices[0]], NE_Labels[indices[0]]))
+        folder_probabilities.append((folder, DA_prob_mean, E_prob_mean, NE_prob_mean))
+
+    # plot probabilities for each folder in a bar plot, 3 subplots for DA, E, NE
+    plt.figure(figsize=(12, 6))
+    for idx, molecule in enumerate(['DA', 'E', 'NE'], start=1):
+        plt.subplot(1, 3, idx)
+        folder_names = [fp[0] for fp in folder_probabilities]
+        prob_means = [fp[idx] for fp in folder_probabilities]
+        # orange for true label 1, blue for true label 0, red dashed line for threshold
+        colors = ['orange' if folder_true_label[i][idx] == 1 else 'blue' for i in range(len(folder_true_label))]
+        
+        plt.bar(folder_names, prob_means, color=colors)
+        plt.axhline(0.5, color='red', linestyle='--')
+        plt.title(f'Mean Predicted Probability for {molecule} by Folder')
+        plt.xlabel('Folder')
+        plt.ylabel('Mean Predicted Probability')
+        plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('visualization/Mean_Predicted_Probabilities_by_Folder.png', dpi = 600)
+    plt.show(block = False)
+    plt.pause(5)
+    plt.close()
 
 
 def test_Ratio_Model(data_dir, model_dir):
@@ -160,7 +159,7 @@ def Ratio_prediction_test(data_dir, model_dir):
         list: Predicted concentration ratios [DA_ratio, E_ratio, NE_ratio].
     """
     # Load and preprocess prediction data
-    Raman_Shift, Intensity, Concentrations = read_spectra_predict(data_dir)
+    Raman_Shift, Intensity, Concentrations = read_spectra_test(data_dir)
     print(f"Raman Shift shape: {Raman_Shift.shape}")
     print(f"Intensity shape: {Intensity.shape}")
     print("Prediction data loaded successfully.")
