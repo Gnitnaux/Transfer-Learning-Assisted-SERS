@@ -9,6 +9,7 @@ from src.utils import spectra_normalization
 from src.utils import plot_probability_distributions_by_label
 from src.model import RF_Identification_Predict
 from src.model import RF_Ratio_Predict
+from src.ae_id_model import AE_Identification_Predict_Multi
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -46,11 +47,30 @@ def test_Identification_Model(data_dir, model_dir):
 
     # Load and test Identification Model (Model 1)
     DA_Labels = (Concentrations[:, 0] > 0).astype(int)  # 1 if DA present, else 0
-    DA_Predictions, DA_Probabilities = RF_Identification_Predict(Intensity_norm, 'DA', model_dir, plot=True, labels=DA_Labels)
     E_Labels = (Concentrations[:, 1] > 0).astype(int)  # 1 if E present, else 0
-    E_Predictions, E_Probabilities = RF_Identification_Predict(Intensity_norm, 'E', model_dir, plot=True, labels=E_Labels)
     NE_Labels = (Concentrations[:, 2] > 0).astype(int)  # 1 if NE present, else 0
-    NE_Predictions, NE_Probabilities = RF_Identification_Predict(Intensity_norm, 'NE', model_dir, plot=True, labels=NE_Labels)
+    multi_predictions, multi_probabilities = AE_Identification_Predict_Multi(Intensity_norm, model_dir)
+    DA_Predictions, E_Predictions, NE_Predictions = multi_predictions[:, 0], multi_predictions[:, 1], multi_predictions[:, 2]
+    DA_Probabilities, E_Probabilities, NE_Probabilities = (
+        multi_probabilities[:, 0],
+        multi_probabilities[:, 1],
+        multi_probabilities[:, 2],
+    )
+
+    for molecule, labels, predictions in [
+        ('DA', DA_Labels, DA_Predictions),
+        ('E', E_Labels, E_Predictions),
+        ('NE', NE_Labels, NE_Predictions),
+    ]:
+        cm = confusion_matrix(labels, predictions, labels=[0, 1])
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[f'Not {molecule}', molecule])
+        disp.plot(cmap=plt.cm.Blues)
+        plt.title(f'Confusion Matrix for {molecule} Identification (AE)')
+        plt.savefig(f'visualization/AE_Identification_{molecule}_Confusion_Matrix.png', dpi=600)
+        plt.show(block=False)
+        plt.pause(5)
+        plt.close()
+
     print("Identification models tested successfully.")
 
     # RF_Identification_Predict returns class-1 probabilities as a 1D array.
@@ -192,11 +212,15 @@ def Ratio_prediction_test(data_dir, model_dir):
 
     # Step 1 - Identify present molecules using Identification Models
     DA_Labels = (Concentrations[:, 0] > 0).astype(int)  # 1 if DA present, else 0
-    DA_Predictions, DA_Probabilities = RF_Identification_Predict(Intensity_norm, 'DA', model_dir, plot=True, labels=DA_Labels)
     E_Labels = (Concentrations[:, 1] > 0).astype(int)  # 1 if E present, else 0
-    E_Predictions, E_Probabilities = RF_Identification_Predict(Intensity_norm, 'E', model_dir, plot=True, labels=E_Labels)
     NE_Labels = (Concentrations[:, 2] > 0).astype(int)  # 1 if NE present, else 0
-    NE_Predictions, NE_Probabilities = RF_Identification_Predict(Intensity_norm, 'NE', model_dir, plot=True, labels=NE_Labels)
+    multi_predictions, multi_probabilities = AE_Identification_Predict_Multi(Intensity_norm, model_dir)
+    DA_Predictions, E_Predictions, NE_Predictions = multi_predictions[:, 0], multi_predictions[:, 1], multi_predictions[:, 2]
+    DA_Probabilities, E_Probabilities, NE_Probabilities = (
+        multi_probabilities[:, 0],
+        multi_probabilities[:, 1],
+        multi_probabilities[:, 2],
+    )
 
 
     # Step 2 - Predict concentration ratios using Ratio Models
