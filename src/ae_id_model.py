@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from src.utils import DA_PROB_THRESHOLD, E_PROB_THRESHOLD, NE_PROB_THRESHOLD
 from src.utils import ID_MOLECULES
 from src.utils import digital_mix_ID_multilabel
+from src.utils import spectra_normalization
 
 
 MOLECULE_TO_INDEX = {'DA': 0, 'E': 1, 'NE': 2}
@@ -194,7 +195,7 @@ def _prepare_mix_dataset(Raman_Shift, Intensity, Category, Concentration, config
     intensity_selected = np.asarray(Intensity[selected], dtype=np.float32)
     category_selected = np.asarray(Category[selected])
 
-    return digital_mix_ID_multilabel(
+    X_mix, y_binary, y_abundance, combo_labels = digital_mix_ID_multilabel(
         Raman_Shift,
         intensity_selected,
         category_selected,
@@ -203,6 +204,15 @@ def _prepare_mix_dataset(Raman_Shift, Intensity, Category, Concentration, config
         Range=(0.5, 10.0),
         seed=config.random_state,
     )
+    X_mix = spectra_normalization(
+        Raman_Shift,
+        X_mix,
+        peak_position=920,
+        peak_range=20,
+        plot=False,
+        mode="ae_id_mix",
+    ).astype(np.float32)
+    return X_mix, y_binary, y_abundance, combo_labels
 
 
 def _build_dataloaders(X, y_binary, y_abundance, combo_labels, config):
@@ -492,7 +502,7 @@ def _load_trained_model(model_dir, map_location=None):
     if map_location is None:
         map_location = _default_device()
     checkpoint_path = os.path.join(model_dir, AE_ID_FILENAME)
-    payload = torch.load(checkpoint_path, map_location=map_location)
+    payload = torch.load(checkpoint_path, map_location=map_location, weights_only=True)
     model = RamanMultiLabelAE(
         input_dim=payload["input_dim"],
         latent_dim=payload["latent_dim"],
