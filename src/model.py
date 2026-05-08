@@ -29,11 +29,11 @@ def RF_Identification_Train(Raman_Shift, Intensity, Category, Concentration, CA,
               and avg_feature_importances.
     """    
     
-    # digital mix data for training
-    Index_con = np.where((Concentration == 10) | (Concentration == 0))[0]
-    Intensity_con = Intensity[Index_con]
-    Category_con = Category[Index_con]
-    Intensity_mix, Label_mix = digital_mix_ID(Raman_Shift, Intensity_con, Category_con, CA, 10, 2000, [0.5, 10])
+    # digital mix data for training - uses all available concentrations
+    Intensity_mix, Label_mix = digital_mix_ID(
+        Raman_Shift, Intensity, Category, Concentration,
+        CA, 2000, [0.5, 10]
+    )
 
     n_features = Intensity_mix.shape[1]
     n_iterations = 100

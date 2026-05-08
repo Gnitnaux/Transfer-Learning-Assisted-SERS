@@ -191,15 +191,11 @@ def _save_loss_curve(history, timestamp):
 
 
 def _prepare_mix_dataset(Raman_Shift, Intensity, Category, Concentration, config):
-    selected = np.where((Concentration == 10) | (Concentration == 0))[0]
-    intensity_selected = np.asarray(Intensity[selected], dtype=np.float32)
-    category_selected = np.asarray(Category[selected])
-
     X_mix, y_binary, y_abundance, combo_labels = digital_mix_ID_multilabel(
         Raman_Shift,
-        intensity_selected,
-        category_selected,
-        data_concentration=10.0,
+        Intensity,
+        Category,
+        Concentration,
         samples_per_combination=config.samples_per_combination,
         Range=(0.5, 10.0),
         seed=config.random_state,

@@ -186,89 +186,97 @@ def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_ran
     return normalized_Intensity
 
 
-def digital_mix_ID(Raman_Shift, Intensity, Category, CA, data_concentration, num_mix = 1000, Range = [0.5, 10]):
+def digital_mix_ID(Raman_Shift, Intensity, Category, Concentration, CA, num_mix=1000, Range=(0.5, 10)):
     """
     Create digital mixed spectra for identification model training.
-    
+
+    Uses single-component spectra from ALL available concentrations (not just
+    the highest). When generating a mixture, each component's spectrum is
+    drawn from the closest available concentration.
+
     Args:
         Raman_Shift (np.ndarray): Array of Raman shift values.
         Intensity (np.ndarray): 2D array of intensity values (samples x features).
         Category (np.ndarray): Array of category labels for each sample.
+        Concentration (np.ndarray): Array of concentration values for each sample.
         CA (str): The target chemical agent for identification.
-        data_concentration (float): The concentration value for the target chemical agent.
-        num_mix (int): The number of mixed spectra to generate.
-        Range (list): The range of concentrations for the mixture components.
+        num_mix (int): Number of mixed spectra to generate.
+        Range (list): The range of total mixture concentrations.
     Returns:
         Intensity_mix (np.ndarray): 2D array of digitally mixed intensity values.
-        Label_mix (0/1): Array of binary labels indicating presence (1) or absence (0) of the target CA.
+        Label_mix (0/1): Array of binary labels indicating presence (1) or absence (0)
+            of the target CA.
     """
+    _ = Raman_Shift
 
-    Index_DA = np.where(Category == 'DA')[0]
-    Index_E = np.where(Category == 'E')[0]
-    Index_NE = np.where(Category == 'NE')[0]
-    Index_BA = np.where(Category == 'BA')[0]
+    rng = np.random.default_rng(42)
+    category = np.asarray(Category)
+    concentration = np.asarray(Concentration, dtype=float)
 
-    Intensity_DA = Intensity[Index_DA]
-    Intensity_E = Intensity[Index_E]
-    Intensity_NE = Intensity[Index_NE]
-    Intensity_BA = Intensity[Index_BA]
+    spectra_pool = {}
+    concentration_levels = {}
+    for molecule in ['DA', 'E', 'NE', 'BA']:
+        indices = np.where(category == molecule)[0]
+        if indices.size == 0:
+            raise ValueError(f"Category '{molecule}' is required for digital mixing.")
+        spectra_pool[molecule] = {}
+        conc_values = np.unique(concentration[indices])
+        concentration_levels[molecule] = sorted(conc_values)
+        for conc in conc_values:
+            conc_indices = indices[concentration[indices] == conc]
+            spectra_pool[molecule][conc] = np.asarray(
+                Intensity[conc_indices], dtype=np.float32
+            )
 
-    # Generate random concentration of mixture
-    np.random.seed(42)  # For reproducibility
-    mix_concentration = np.random.uniform(Range[0], Range[1], num_mix)
-    ratio_CA = mix_concentration / data_concentration
+    max_conc = max(concentration_levels['DA'])
+
+    mix_concentration = rng.uniform(Range[0], Range[1], num_mix)
+    ratio_CA = mix_concentration / max_conc
 
     ratio_CAs = []
     Label_mix = []
-    # Generate radom ratio containing CA
-    for i in range(num_mix//2):
-        ratio_target = (np.random.uniform(0.3, 1, 1)[0]) * ratio_CA[i]  # Ratio of CA in the mixture
-        ratio_other_1 = (np.random.uniform(0, 1 - ratio_target, 1)[0]) * ratio_CA[i]  # Ratio of other component 1
-        ratio_other_2 = (1 - ratio_target - ratio_other_1) * ratio_CA[i]  # Ratio of other component
+
+    for i in range(num_mix // 2):
+        ratio_target = (rng.uniform(0.3, 1, 1)[0]) * ratio_CA[i]
+        ratio_other_1 = (rng.uniform(0, 1 - ratio_target, 1)[0]) * ratio_CA[i]
+        ratio_other_2 = (1 - ratio_target - ratio_other_1) * ratio_CA[i]
         if CA == 'DA':
-            ratio_CAs.append([ratio_target, ratio_other_1, ratio_other_2, 1- ratio_CA[i]])
+            ratio_CAs.append([ratio_target, ratio_other_1, ratio_other_2, 1 - ratio_CA[i]])
         elif CA == 'E':
-            ratio_CAs.append([ratio_other_1, ratio_target, ratio_other_2, 1- ratio_CA[i]])
+            ratio_CAs.append([ratio_other_1, ratio_target, ratio_other_2, 1 - ratio_CA[i]])
         elif CA == 'NE':
-            ratio_CAs.append([ratio_other_1, ratio_other_2, ratio_target, 1- ratio_CA[i]])
-        Label_mix.append(1)  # Label 1 for spectra containing CA
+            ratio_CAs.append([ratio_other_1, ratio_other_2, ratio_target, 1 - ratio_CA[i]])
+        Label_mix.append(1)
 
-    for i in range(num_mix - num_mix//2):
-        ratio_other_1 = (np.random.uniform(0, 1, 1)[0]) * ratio_CA[i]  # Ratio of other component 1
-        ratio_other_2 = (np.random.uniform(0, 1 - ratio_other_1, 1)[0]) * ratio_CA[i]  # Ratio of other component 2
+    for i in range(num_mix - num_mix // 2):
+        ratio_other_1 = (rng.uniform(0, 1, 1)[0]) * ratio_CA[i]
+        ratio_other_2 = (rng.uniform(0, 1 - ratio_other_1, 1)[0]) * ratio_CA[i]
         if CA == 'DA':
-            ratio_CAs.append([0, ratio_other_1, ratio_other_2, 1- ratio_CA[i]])
+            ratio_CAs.append([0, ratio_other_1, ratio_other_2, 1 - ratio_CA[i]])
         elif CA == 'E':
-            ratio_CAs.append([ratio_other_1, 0, ratio_other_2, 1- ratio_CA[i]])
+            ratio_CAs.append([ratio_other_1, 0, ratio_other_2, 1 - ratio_CA[i]])
         elif CA == 'NE':
-            ratio_CAs.append([ratio_other_1, ratio_other_2, 0, 1- ratio_CA[i]])
-        Label_mix.append(0)  # Label 0 for spectra not containing CA
+            ratio_CAs.append([ratio_other_1, ratio_other_2, 0, 1 - ratio_CA[i]])
+        Label_mix.append(0)
 
-    # print(ratio_CAs[:10])
-
-    # Linear combination of spectra based on concentration and ratio
     Intensity_mix = []
+    molecules = ['DA', 'E', 'NE']
     for i in range(num_mix):
-        selected_DA = Intensity_DA[np.random.choice(Intensity_DA.shape[0])]
-        selected_E = Intensity_E[np.random.choice(Intensity_E.shape[0])]
-        selected_NE = Intensity_NE[np.random.choice(Intensity_NE.shape[0])]
-        selected_BA = Intensity_BA[np.random.choice(Intensity_BA.shape[0])]
-
-        mixed_spectrum = (ratio_CAs[i][0] * selected_DA + ratio_CAs[i][1] * selected_E +
-                          ratio_CAs[i][2] * selected_NE + ratio_CAs[i][3] * selected_BA)
-        Intensity_mix.append(mixed_spectrum)
+        spectrum = np.zeros(Intensity.shape[1], dtype=np.float32)
+        total_conc = mix_concentration[i]
+        spectrum += ratio_CAs[i][3] * _sample_spectrum(
+            spectra_pool['BA'], concentration_levels['BA'], 0.0, rng
+        )
+        for j, mol in enumerate(molecules):
+            target_conc = ratio_CAs[i][j] * max_conc
+            if ratio_CAs[i][j] > 0:
+                spectrum += ratio_CAs[i][j] * _sample_spectrum(
+                    spectra_pool[mol], concentration_levels[mol], target_conc, rng
+                )
+        Intensity_mix.append(spectrum)
 
     Intensity_mix = np.array(Intensity_mix)
     Label_mix = np.array(Label_mix)
-
-    # plt.figure(figsize=(10, 6))
-    # for i in range(10):  # Plot the first 10 mixed spectra
-    #     plt.plot(Raman_Shift, Intensity_mix[i, :], label=f'Mixed Spectrum {i+1} (Label: {Label_mix[i]})')
-    # plt.xlabel('Raman Shift (cm⁻¹)')
-    # plt.ylabel('Intensity')
-    # plt.title(f'Digitally Mixed SERS Spectra for {CA} Identification')
-    # plt.legend()
-    # plt.show()
 
     return Intensity_mix, Label_mix
 
@@ -277,7 +285,7 @@ def digital_mix_ID_multilabel(
     Raman_Shift,
     Intensity,
     Category,
-    data_concentration=10.0,
+    Concentration,
     samples_per_combination=400,
     Range=(0.5, 10.0),
     seed=42,
@@ -285,16 +293,20 @@ def digital_mix_ID_multilabel(
     """
     Create digitally mixed spectra for a shared multi-label identification model.
 
-    The synthetic mixtures are built from 10 uM single-component spectra (DA/E/NE)
-    and background spectra (BA). Eight balanced mixture patterns are generated:
+    Uses single-component spectra from ALL available concentrations (not just 10 uM).
+    When generating a mixture, each component's spectrum is drawn from the closest
+    available concentration to the target concentration in the mixture. This yields
+    more realistic spectral shapes than using only a single reference concentration.
+
+    Eight balanced mixture patterns are generated:
     BA, DA, E, NE, DA+E, DA+NE, E+NE, DA+E+NE.
 
     Args:
         Raman_Shift (np.ndarray): Array of Raman shift values.
         Intensity (np.ndarray): 2D array of intensity values (samples x features).
         Category (np.ndarray): Array of category labels for each sample.
-        data_concentration (float): Concentration represented by the single-component spectra.
-        samples_per_combination (int): Number of synthetic spectra for each composition pattern.
+        Concentration (np.ndarray): Array of concentration values for each sample.
+        samples_per_combination (int): Number of synthetic spectra per composition pattern.
         Range (tuple): Total analyte concentration range in uM for non-background mixtures.
         seed (int): Random seed for reproducibility.
 
@@ -305,17 +317,29 @@ def digital_mix_ID_multilabel(
             Abundance_mix (np.ndarray): Mixing ratios with shape (N, 4) for DA/E/NE/BA.
             Combination_labels (np.ndarray): Integer labels in [0, 7].
     """
-    _ = Raman_Shift  # kept for interface symmetry with the original helper
+    _ = Raman_Shift
 
     rng = np.random.default_rng(seed)
     category = np.asarray(Category)
+    concentration = np.asarray(Concentration, dtype=float)
 
-    spectra_by_category = {}
+    # Build (category, concentration) → spectra pool
+    spectra_pool = {}
+    concentration_levels = {}
     for molecule in ['DA', 'E', 'NE', 'BA']:
         indices = np.where(category == molecule)[0]
         if indices.size == 0:
             raise ValueError(f"Category '{molecule}' is required for digital mixing.")
-        spectra_by_category[molecule] = np.asarray(Intensity[indices], dtype=np.float32)
+        spectra_pool[molecule] = {}
+        conc_values = np.unique(concentration[indices])
+        concentration_levels[molecule] = sorted(conc_values)
+        for conc in conc_values:
+            conc_indices = indices[concentration[indices] == conc]
+            spectra_pool[molecule][conc] = np.asarray(
+                Intensity[conc_indices], dtype=np.float32
+            )
+
+    max_conc = max(concentration_levels['DA'])
 
     combinations = [
         (0, 0, 0),
@@ -338,7 +362,7 @@ def digital_mix_ID_multilabel(
         for _sample_idx in range(samples_per_combination):
             if active_indices:
                 total_concentration = rng.uniform(Range[0], Range[1])
-                total_ratio = total_concentration / float(data_concentration)
+                total_ratio = total_concentration / max_conc
                 component_split = rng.dirichlet(np.ones(len(active_indices)))
             else:
                 total_ratio = 0.0
@@ -350,10 +374,15 @@ def digital_mix_ID_multilabel(
             abundance[3] = max(0.0, 1.0 - float(np.sum(abundance[:3])))
 
             spectrum = np.zeros(Intensity.shape[1], dtype=np.float32)
-            spectrum += abundance[3] * spectra_by_category['BA'][rng.integers(len(spectra_by_category['BA']))]
-            spectrum += abundance[0] * spectra_by_category['DA'][rng.integers(len(spectra_by_category['DA']))]
-            spectrum += abundance[1] * spectra_by_category['E'][rng.integers(len(spectra_by_category['E']))]
-            spectrum += abundance[2] * spectra_by_category['NE'][rng.integers(len(spectra_by_category['NE']))]
+            spectrum += abundance[3] * _sample_spectrum(
+                spectra_pool['BA'], concentration_levels['BA'], 0.0, rng
+            )
+            for active_idx in active_indices:
+                molecule = ['DA', 'E', 'NE'][active_idx]
+                target_conc = float(total_concentration * component_split[active_indices.index(active_idx)])
+                spectrum += abundance[active_idx] * _sample_spectrum(
+                    spectra_pool[molecule], concentration_levels[molecule], target_conc, rng
+                )
 
             mixed_spectra.append(spectrum)
             binary_labels.append(np.asarray(combination, dtype=np.float32))
@@ -366,6 +395,18 @@ def digital_mix_ID_multilabel(
         np.asarray(abundance_labels, dtype=np.float32),
         np.asarray(combination_labels, dtype=np.int64),
     )
+
+
+def _sample_spectrum(spectra_by_conc, concentration_levels, target_conc, rng):
+    """Select a random spectrum from the concentration level closest to target_conc."""
+    if target_conc <= 0 or len(concentration_levels) == 1:
+        conc_key = concentration_levels[0]
+    else:
+        # find closest concentration level
+        diffs = [abs(c - target_conc) for c in concentration_levels]
+        conc_key = concentration_levels[int(np.argmin(diffs))]
+    pool = spectra_by_conc[conc_key]
+    return pool[rng.integers(len(pool))]
 
 
 def plot_probability_distributions_by_label(probabilities, labels, title, folders):
