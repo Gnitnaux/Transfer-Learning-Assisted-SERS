@@ -28,14 +28,7 @@ def train_model(data_dir, model_dir):
     print("Data normalization completed.")
 
     # Build Identification Model (Model 1)
-    AE_IdModel = AE_Identification_Train(
-        Raman_Shift,
-        Intensity_norm,
-        Category,
-        Concentration,
-        model_dir,
-        plot=True,
-    )
+    AE_IdModel = AE_Identification_Train(Raman_Shift, Intensity_norm, Category, Concentration, model_dir, plot=True, digital_mix=True)
     print("AE identification model trained successfully.")
 
     # Build Ratio Model (Model 2)

@@ -96,7 +96,7 @@ def main():
         print(f"Intensity shape: {Intensity.shape}")
         Intensity_norm = spectra_normalization(
             Raman_Shift, Intensity,
-            peak_position=920, peak_range=20, plot=True, mode='plsr_train'
+            peak_position=920, peak_range=20, plot=True, mode='plsr_train', minmax_scale = False
         )
         print("Data normalization completed.")
         PLSR_Train(Raman_Shift, Intensity_norm, Concentration, Category,
@@ -112,7 +112,7 @@ def main():
         print(f"Intensity shape: {Intensity.shape}")
         Intensity_norm = spectra_normalization(
             Raman_Shift, Intensity,
-            peak_position=920, peak_range=20, plot=True, mode='plsr_test'
+            peak_position=920, peak_range=20, plot=True, mode='plsr_test', minmax_scale = False
         )
         print("Data normalization completed.")
         total_true = np.sum(Concentrations, axis=1)

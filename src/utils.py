@@ -141,7 +141,7 @@ def read_spectra_unknown(directory):
 
     return Raman_Shift, Intensity, Labels
 
-def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_range = 20, plot = False, mode = 'train'):
+def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_range = 20, plot = False, mode = 'train', minmax_scale = True):
     """
     Normalize SERS spectra based on a specific peak intensity.
     
@@ -166,9 +166,10 @@ def spectra_normalization(Raman_Shift, Intensity, peak_position = 1480, peak_ran
             normalized_Intensity[i, :] = Intensity[i, :]
 
     # min-max scaling to [0, 1]
-    min_vals = np.min(normalized_Intensity, axis=1, keepdims=True)
-    max_vals = np.max(normalized_Intensity, axis=1, keepdims=True)
-    normalized_Intensity = (normalized_Intensity - min_vals) / (max_vals - min_vals + 1e-8)
+    if minmax_scale:
+        min_vals = np.min(normalized_Intensity, axis=1, keepdims=True)
+        max_vals = np.max(normalized_Intensity, axis=1, keepdims=True)
+        normalized_Intensity = (normalized_Intensity - min_vals) / (max_vals - min_vals + 1e-8)
     
     if plot:
         plt.figure(figsize=(10, 6))
@@ -281,15 +282,7 @@ def digital_mix_ID(Raman_Shift, Intensity, Category, Concentration, CA, num_mix=
     return Intensity_mix, Label_mix
 
 
-def digital_mix_ID_multilabel(
-    Raman_Shift,
-    Intensity,
-    Category,
-    Concentration,
-    samples_per_combination=400,
-    Range=(0.5, 10.0),
-    seed=42,
-):
+def digital_mix_ID_multilabel(Raman_Shift, Intensity, Category, Concentration, samples_per_combination=400, Range=(0.5, 10.0), seed=42):
     """
     Create digitally mixed spectra for a shared multi-label identification model.
 
@@ -319,6 +312,10 @@ def digital_mix_ID_multilabel(
     """
     _ = Raman_Shift
 
+    # normalize the spectrum without min-max scaling
+    Intensity_norm = spectra_normalization(Raman_Shift, Intensity, peak_position=920, peak_range=20, 
+                                           plot=False, mode = 'digital_mix', minmax_scale = False)
+
     rng = np.random.default_rng(seed)
     category = np.asarray(Category)
     concentration = np.asarray(Concentration, dtype=float)
@@ -336,7 +333,7 @@ def digital_mix_ID_multilabel(
         for conc in conc_values:
             conc_indices = indices[concentration[indices] == conc]
             spectra_pool[molecule][conc] = np.asarray(
-                Intensity[conc_indices], dtype=np.float32
+                Intensity_norm[conc_indices], dtype=np.float32
             )
 
     max_conc = max(concentration_levels['DA'])
@@ -373,7 +370,7 @@ def digital_mix_ID_multilabel(
                 abundance[active_idx] = total_ratio * float(split_value)
             abundance[3] = max(0.0, 1.0 - float(np.sum(abundance[:3])))
 
-            spectrum = np.zeros(Intensity.shape[1], dtype=np.float32)
+            spectrum = np.zeros(Intensity_norm.shape[1], dtype=np.float32)
             spectrum += abundance[3] * _sample_spectrum(
                 spectra_pool['BA'], concentration_levels['BA'], 0.0, rng
             )
@@ -388,6 +385,12 @@ def digital_mix_ID_multilabel(
             binary_labels.append(np.asarray(combination, dtype=np.float32))
             abundance_labels.append(abundance)
             combination_labels.append(combination_id)
+
+    # min-max scaling to [0, 1]
+    mixed_spectra = np.array(mixed_spectra)
+    min_vals = np.min(mixed_spectra, axis=1, keepdims=True)
+    max_vals = np.max(mixed_spectra, axis=1, keepdims=True)
+    mixed_spectra = (mixed_spectra - min_vals) / (max_vals - min_vals + 1e-8)
 
     return (
         np.asarray(mixed_spectra, dtype=np.float32),

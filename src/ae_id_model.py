@@ -117,7 +117,7 @@ class RamanMultiLabelAE(nn.Module):
 class TrainingConfig:
     samples_per_combination: int = 2000
     batch_size: int = 128
-    epochs: int = 1000
+    epochs: int = 300
     learning_rate: float = 1e-3
     weight_decay: float = 1e-4
     validation_size: float = 0.2
@@ -197,7 +197,7 @@ def _prepare_mix_dataset(Raman_Shift, Intensity, Category, Concentration, config
         Category,
         Concentration,
         samples_per_combination=config.samples_per_combination,
-        Range=(0.5, 10.0),
+        Range=(0.3, 10.0),
         seed=config.random_state,
     )
     X_mix = spectra_normalization(
@@ -207,6 +207,30 @@ def _prepare_mix_dataset(Raman_Shift, Intensity, Category, Concentration, config
         peak_range=20,
         plot=False,
         mode="ae_id_mix",
+    ).astype(np.float32)
+    y_binary = np.asarray(y_binary, dtype=np.float32)
+    y_abundance = np.asarray(y_abundance, dtype=np.float32)
+    return X_mix, y_binary, y_abundance, combo_labels
+
+def _prepare_real_dataset(Raman_Shift, Intensity, Category, Concentration, config):
+    combo_labels = np.array(
+        [COMBINATION_TO_INDEX[tuple(row)] for row in zip(Category == 'DA', Category == 'E', Category == 'NE')],
+        dtype=np.int64,
+    )
+    y_binary = np.column_stack([(Category == molecule).astype(np.float32) for molecule in ID_MOLECULES])
+    category_to_abundance_index = {"DA": 0, "E": 1, "NE": 2, "BA": 3}
+    y_abundance = np.zeros((len(Category), 4), dtype=np.float32)
+    for idx, molecule in enumerate(Category):
+        abundance_index = category_to_abundance_index.get(str(molecule))
+        if abundance_index is not None:
+            y_abundance[idx, abundance_index] = 1.0
+    X_mix = spectra_normalization(
+        Raman_Shift,
+        Intensity,
+        peak_position=920,
+        peak_range=20,
+        plot=False,
+        mode="ae_id_real",
     ).astype(np.float32)
     return X_mix, y_binary, y_abundance, combo_labels
 
@@ -228,14 +252,14 @@ def _build_dataloaders(X, y_binary, y_abundance, combo_labels, config):
     X_train, X_val, y_train, y_val, a_train, a_val, combo_train, combo_val = split
 
     train_dataset = TensorDataset(
-        torch.from_numpy(X_train),
-        torch.from_numpy(y_train),
-        torch.from_numpy(a_train),
+        torch.from_numpy(X_train).float(),
+        torch.from_numpy(y_train).float(),
+        torch.from_numpy(a_train).float(),
     )
     val_dataset = TensorDataset(
-        torch.from_numpy(X_val),
-        torch.from_numpy(y_val),
-        torch.from_numpy(a_val),
+        torch.from_numpy(X_val).float(),
+        torch.from_numpy(y_val).float(),
+        torch.from_numpy(a_val).float(),
     )
 
     train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, drop_last=False)
@@ -251,9 +275,9 @@ def _evaluate_model(model, data_loader, device, config):
     labels_all = []
     with torch.no_grad():
         for batch_x, batch_labels, batch_abundance in data_loader:
-            batch_x = batch_x.to(device)
-            batch_labels = batch_labels.to(device)
-            batch_abundance = batch_abundance.to(device)
+            batch_x = batch_x.to(device=device, dtype=torch.float32)
+            batch_labels = batch_labels.to(device=device, dtype=torch.float32)
+            batch_abundance = batch_abundance.to(device=device, dtype=torch.float32)
 
             output = model(batch_x)
             cls_loss = F.binary_cross_entropy_with_logits(output["logits"], batch_labels)
@@ -289,7 +313,7 @@ def _evaluate_model(model, data_loader, device, config):
     }
 
 
-def AE_Identification_Train(Raman_Shift, Intensity, Category, Concentration, model_dir, plot=False, config=None):
+def AE_Identification_Train(Raman_Shift, Intensity, Category, Concentration, model_dir, plot=False, config=None, digital_mix=True):
     """
     Train a shared multi-label autoencoder identification model.
     """
@@ -305,9 +329,14 @@ def AE_Identification_Train(Raman_Shift, Intensity, Category, Concentration, mod
     logger.info("Training AE identification model on device: %s", device)
     logger.info("Training config: %s", config)
 
-    X_mix, y_binary, y_abundance, combo_labels = _prepare_mix_dataset(
-        Raman_Shift, Intensity, Category, Concentration, config
-    )
+    if digital_mix:
+        X_mix, y_binary, y_abundance, combo_labels = _prepare_mix_dataset(
+            Raman_Shift, Intensity, Category, Concentration, config
+        )
+    else:
+        X_mix, y_binary, y_abundance, combo_labels = _prepare_real_dataset(
+            Raman_Shift, Intensity, Category, Concentration, config
+        )
     logger.info(
         "Synthetic dataset prepared. X_mix=%s, y_binary=%s, y_abundance=%s",
         X_mix.shape,
@@ -344,9 +373,9 @@ def AE_Identification_Train(Raman_Shift, Intensity, Category, Concentration, mod
             model.train()
             train_losses = []
             for batch_x, batch_labels, batch_abundance in train_loader:
-                batch_x = batch_x.to(device)
-                batch_labels = batch_labels.to(device)
-                batch_abundance = batch_abundance.to(device)
+                batch_x = batch_x.to(device=device, dtype=torch.float32)
+                batch_labels = batch_labels.to(device=device, dtype=torch.float32)
+                batch_abundance = batch_abundance.to(device=device, dtype=torch.float32)
 
                 optimizer.zero_grad(set_to_none=True)
                 with torch.amp.autocast(device_type=device.type, enabled=device.type == "cuda"):
